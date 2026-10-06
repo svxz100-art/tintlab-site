@@ -820,7 +820,6 @@ function getGalleryShortTitle(){
     </div>
     <div class="issuedActions noPrint">
      <button class="btn dark" onclick="openIssuedCustomerView()">고객용 보증서 보기</button>
-     <button class="btn kakao" onclick="shareKakao()">카카오톡 공유</button>
      <button class="btn" onclick="copyIssuedShare()">링크 복사</button>
      <button class="btn" onclick="smsIssuedShare()">문자 발송</button>
      <button class="btn" onclick="printJustIssued()">PDF 저장</button>
@@ -2946,7 +2945,6 @@ function renderDetail(w){
  <div class="sharebox noPrint" style="margin-top:10px"><b>고객용 보증서 링크</b><br><span class="muted">고객 전달 전용 URL</span><div style="margin-top:7px"><code id="shareUrl"></code></div></div>`:"";
  const adminActions=isAdminAuthed()?`
   <button class="btn" onclick="copyShare()">링크 복사</button>
-  <button class="btn kakao" onclick="shareKakao()">카카오톡 공유</button>
   <button class="btn" onclick="editWarranty(${w.id})">✏️ 보증서 수정</button>
   <button class="btn danger" onclick="removeWarranty(${w.id})">🗑️ 보증서 삭제</button>`:"";
  // 고객이 공유링크로 직접 들어온 경우에는 매장 관리용 정보(알림톡 발송상태, 고객용 링크 복사 등)는 보여주지 않고
@@ -2972,15 +2970,6 @@ function buildShareUrl(w){return location.href.split("#")[0]+"#warranty="+encode
 function copyShare(){
  const u=buildShareUrl(selected);
  navigator.clipboard?.writeText(u).then(()=>alert("고객용 보증서 링크를 복사했습니다."),()=>prompt("링크를 복사해주세요.",u));
-}
-
-function shareKakao(){
- if(!selected)return;
- const u=buildShareUrl(selected);
- navigator.clipboard?.writeText(u).then(
-   ()=>alert("카카오톡 연결 기능은 잠시 비활성화되어 있습니다. 고객용 보증서 링크를 복사했습니다. 카카오톡 대화창에 붙여넣어 보내주세요."),
-   ()=>prompt("카카오톡 연결 기능은 잠시 비활성화되어 있습니다. 아래 링크를 복사해 보내주세요.",u)
- );
 }
 
 async function removeWarranty(id){
