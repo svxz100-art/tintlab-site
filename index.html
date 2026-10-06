@@ -1101,9 +1101,25 @@ const DEFAULT_PACKAGE_TIERS=[
    {name:"서비스품목",items:["프리미엄 신차 검수, 기본 세차, 신차 비닐 제거(선택)","타이어 광택, 가죽 코팅, 전면 유리발수코팅","실내 항균 탈취(피톤치드)"]}
  ],footnote:"*대형 SUV, 승합차, 수입차 추가금 발생/썬루프 추가금 발생"}
 ];
-/* 테슬라 전용 신차패키지 — 우선은 일반 패키지와 동일한 구성으로 시작하며, 관리자가 별도로 수정할 수 있습니다. */
+/* 테슬라 전용 신차패키지 — 틴팅 구성은 일반 패키지와 동일하게 두고, 블랙박스/PPF/유리막코팅/서비스품목은 테슬라 전용 구성으로 따로 관리합니다. */
 const PACKAGE_TIER_KEY_TESLA="tintrap_package_tiers_tesla_v1";
-const DEFAULT_PACKAGE_TIERS_TESLA=JSON.parse(JSON.stringify(DEFAULT_PACKAGE_TIERS)).map(t=>({...t,id:"tesla_"+t.id}));
+const TESLA_PPF_ITEMS=["생보8종","도어컵, 도어엣지, 충전구, B필러, 휠아크, 헤드라이트, 디스플레이 2P"];
+const TESLA_COATING_ITEMS=["블라스크 RX711"];
+const TESLA_SERVICE_ITEMS=["프리미엄 신차 검수, 기본 세차","타이어 광택, 가죽 코팅, 실내 항균 탈취(피톤치드)"];
+const TESLA_FOOTNOTE="*모델YL, 모델3 열선 통시공 추가금 발생/썬루프 추가금 발생";
+const DEFAULT_PACKAGE_TIERS_TESLA=DEFAULT_PACKAGE_TIERS.map(t=>({
+ ...t,
+ id:"tesla_"+t.id,
+ priceNote:"",
+ categories:t.categories.filter(c=>c.name!=="블랙박스").map(c=>{
+  if(c.name==="틴팅")return JSON.parse(JSON.stringify(c));
+  if(c.name==="PPF")return {...c,items:[...TESLA_PPF_ITEMS]};
+  if(c.name==="유리막코팅")return {...c,items:[...TESLA_COATING_ITEMS]};
+  if(c.name==="서비스품목")return {...c,items:[...TESLA_SERVICE_ITEMS]};
+  return JSON.parse(JSON.stringify(c));
+ }),
+ footnote:TESLA_FOOTNOTE
+}));
 function pkgTierStorageKey(track){return track==="tesla"?PACKAGE_TIER_KEY_TESLA:PACKAGE_TIER_KEY}
 function pkgTierDefaults(track){return track==="tesla"?DEFAULT_PACKAGE_TIERS_TESLA:DEFAULT_PACKAGE_TIERS}
 function getPackageTiers(track){try{return JSON.parse(localStorage.getItem(pkgTierStorageKey(track))||"null")||pkgTierDefaults(track)}catch(e){return pkgTierDefaults(track)}}
