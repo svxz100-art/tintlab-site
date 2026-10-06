@@ -60,6 +60,8 @@ main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .certNoticeDesc{font-size:9px;line-height:1.48;color:#444}
 .certFooter{margin-top:14px;padding-top:12px;border-top:1px solid #e4e2dd;font-size:10px;color:#8a8a8a;text-align:center;line-height:1.6}
 @media(max-width:720px){.certInfoGrid{grid-template-columns:1fr}.certPrintPage .certDoc{padding:5mm 4mm}.certHead{flex-direction:column}.certHeadRight{text-align:left}.certNotices{column-count:1}}
+/* 모바일 화면에서는 A4 한 장 모양으로 억지로 맞추지 않고 내용이 잘리지 않게 자연스럽게 세로로 흐르게 합니다 (인쇄할 때는 별도 @media print 규칙이 그대로 적용됩니다) */
+@media(max-width:720px){.certPrintPage .certDoc{aspect-ratio:auto!important;height:auto!important;overflow:visible!important;transform:none!important}}
 
 /* 보증서 발행 화면: 보증서 조회 화면과 같은 A4 흰 종이 느낌으로 통일 (certHead/certHeadTitle/certHr/certSecTitle/certTotalBar는 위 공용 클래스 재사용) */
 #page-issue .formCard{max-width:210mm;margin:0 auto;background:transparent;border:0;padding:0}
@@ -2865,26 +2867,31 @@ function renderDetail(w){
  const kakaoStatusBadge = w.kakaoStatus === "발송 완료"
   ? `<span class="pill kakao-done">💬 모바일 알림톡 발송 완료 (${w.kakaoSentAt||"기록됨"})</span>`
   : `<span class="pill kakao-wait">💬 모바일 알림톡 미발송</span>`;
+ const adminExtras=isAdminAuthed()?`
+ <div class="sharebox noPrint" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
+  <div><b>알림톡 전송 상태</b><br><div style="margin-top:4px">${kakaoStatusBadge}</div></div>
+  <button class="btn" style="font-size:11px;padding:6px 10px;" onclick="toggleManualKakaoStatus(${w.id})">상태 변경</button>
+ </div>
+ <div class="sharebox noPrint" style="margin-top:10px"><b>고객용 보증서 링크</b><br><span class="muted">고객 전달 전용 URL</span><div style="margin-top:7px"><code id="shareUrl"></code></div></div>`:"";
+ const adminActions=isAdminAuthed()?`
+  <button class="btn" onclick="copyShare()">링크 복사</button>
+  <button class="btn kakao" onclick="shareKakao()">카카오톡 공유</button>
+  <button class="btn" onclick="editWarranty(${w.id})">✏️ 보증서 수정</button>
+  <button class="btn danger" onclick="removeWarranty(${w.id})">🗑️ 보증서 삭제</button>`:"";
+ // 고객이 공유링크로 직접 들어온 경우에는 매장 관리용 정보(알림톡 발송상태, 고객용 링크 복사 등)는 보여주지 않고
+ // 보증서 내용 + PDF저장/인쇄 버튼만 보이게 합니다.
  document.getElementById("detail").innerHTML=`
  <div class="certPrintPage">
  <div class="certDoc">
   ${certDocInnerHtml(w, shop, precautions, t)}
  </div>
  </div>
-
- <div class="sharebox noPrint" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
-  <div><b>알림톡 전송 상태</b><br><div style="margin-top:4px">${kakaoStatusBadge}</div></div>
-  ${isAdminAuthed()?`<button class="btn" style="font-size:11px;padding:6px 10px;" onclick="toggleManualKakaoStatus(${w.id})">상태 변경</button>`:""}
- </div>
- <div class="sharebox noPrint" style="margin-top:10px"><b>고객용 보증서 링크</b><br><span class="muted">고객 전달 전용 URL</span><div style="margin-top:7px"><code id="shareUrl"></code></div></div>
+ ${adminExtras}
  <div class="actions noPrint">
-  <button class="btn" onclick="copyShare()">링크 복사</button>
-  <button class="btn kakao" onclick="shareKakao()">카카오톡 공유</button>
   <button class="btn" onclick="window.print()">PDF 저장 / 인쇄</button>
-  ${isAdminAuthed()?`<button class="btn" onclick="editWarranty(${w.id})">✏️ 보증서 수정</button>`:""}
-  ${isAdminAuthed()?`<button class="btn danger" onclick="removeWarranty(${w.id})">🗑️ 보증서 삭제</button>`:""}
+  ${adminActions}
  </div>`;
- document.getElementById("shareUrl").textContent=buildShareUrl(w);
+ if(isAdminAuthed())document.getElementById("shareUrl").textContent=buildShareUrl(w);
  fitCertDocToA4(document.querySelector("#detail .certDoc"));
 }
 
