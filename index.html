@@ -1780,9 +1780,17 @@ function pkgEditRender(){
    <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="pkgEditAddTier()">+ 새 패키지 추가</button>
    <div class="actions" style="margin-top:16px">
     <button class="btn" onclick="pkgEditCancel()">취소</button>
+    <button class="btn danger" onclick="pkgEditResetDefault()">기본값으로 초기화</button>
     <button class="btn super" onclick="pkgEditSave()">저장하기</button>
    </div>
   `;
+}
+function pkgEditResetDefault(){
+  if(!confirm((PKG_EDIT_TRACK==="tesla"?"테슬라 전용 신차패키지":"신차패키지")+" 견적 내용을 기본값으로 초기화하시겠습니까? 지금까지 직접 수정한 내용은 사라집니다."))return;
+  localStorage.removeItem(pkgTierStorageKey(PKG_EDIT_TRACK));
+  PKG_EDIT_STATE=JSON.parse(JSON.stringify(pkgTierDefaults(PKG_EDIT_TRACK)));
+  pkgEditRender();
+  alert("기본값으로 초기화되었습니다. 저장하기를 눌러야 실제로 반영됩니다.");
 }
 function pkgEditAddCat(ti){
   pkgEditCollect();
