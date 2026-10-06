@@ -23,10 +23,15 @@ header{background:rgba(10,11,13,.86);backdrop-filter:blur(10px);border-bottom:1p
 main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .brandmark{display:inline-block;background:none;color:#111;font-weight:700;font-size:15px;letter-spacing:.08em;padding:0;border-radius:0;font-style:normal;font-family:var(--font-display)}
 .btn{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:12px 18px;font-weight:700;font-family:var(--font-display);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;transition:background .15s ease,color .15s ease,border-color .15s ease,filter .15s ease,transform .1s ease}.btn:hover{background:var(--soft)}.btn:active{transform:scale(.97)}.btn.dark{background:var(--accent);color:#fff;border-color:var(--accent)}.btn.dark:hover{filter:brightness(1.15)}.btn.danger{color:var(--danger);border-color:rgba(255,107,94,.4)}.btn.kakao{background:var(--kakao);color:var(--kakaotext);border-color:#e6cf00}.btn.super{background:var(--super);color:#1a1025;border-color:var(--super)}
-.issuedCheck{width:56px;height:56px;border-radius:50%;background:#edf7f1;color:var(--ok);font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto}
-.issuedNo{font-size:22px;font-weight:800;letter-spacing:-.02em;background:#f6f6f4;border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0 18px}
+.issuedCheck{width:64px;height:64px;border-radius:50%;background:var(--kakao);color:#000;font-size:28px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto}
+.issuedCheck.issuedCheckWait{background:var(--soft);color:var(--muted)}
+.issuedNo{font-size:11px;color:var(--muted);margin-top:10px}
 .issuedActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.issuedActions .btn{width:100%}
 @media(max-width:480px){.issuedActions{grid-template-columns:1fr}}
+.issuedFooterNav{display:flex;align-items:center;justify-content:center;gap:28px;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.issuedFooterNav span{cursor:pointer}
+.issuedFooterNav span:hover{color:var(--ink)}
+.issuedMore{margin-top:16px;text-align:left}
 .itemRows{display:grid;gap:8px;margin-bottom:10px}
 .itemRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .itemRow input{flex:1;min-width:160px;padding:11px;border:1px solid var(--line);border-radius:0;outline:0;font-size:13px;background:var(--bg);color:var(--ink)}
@@ -806,27 +811,29 @@ function getGalleryShortTitle(){
 <section id="page-issued" class="hidden">
  <div class="detail">
   <div class="detailCard" style="text-align:center">
-   <div class="detailHead" style="border-bottom:0">
-    <div class="issuedCheck">✓</div>
-    <h2 style="margin:14px 0 4px">보증서 발행 완료</h2>
-    <div class="muted">고객에게 아래 링크를 전달해주세요</div>
-   </div>
-   <div class="detailBody" style="padding-top:0">
+   <div class="detailBody" style="padding-top:36px">
+    <div class="issuedCheck" id="issued-check">✓</div>
+    <h2 id="issued-headline" style="margin:16px 0 6px"></h2>
+    <div class="muted" id="issued-sub"></div>
     <div class="issuedNo" id="issued-no">-</div>
-    <div style="margin-bottom:10px;" id="issued-kakao-status"></div>
-    <div class="sharebox" style="text-align:left">
-     <b>고객용 보증서 링크</b><br><span class="muted">고객 전달용 전용 주소</span>
-     <div style="margin-top:7px"><code id="issued-shareUrl"></code></div>
+    <div class="actions noPrint" style="margin-top:22px">
+     <button class="btn dark" onclick="openIssuedCustomerView()">고객용 보증서 확인하기</button>
     </div>
-    <div class="issuedActions noPrint">
-     <button class="btn dark" onclick="openIssuedCustomerView()">고객용 보증서 보기</button>
-     <button class="btn" onclick="copyIssuedShare()">링크 복사</button>
-     <button class="btn" onclick="smsIssuedShare()">문자 발송</button>
-     <button class="btn" onclick="printJustIssued()">PDF 저장</button>
+    <div class="issuedFooterNav noPrint">
+     <span onclick="show('admin')">보증서 목록</span>
+     <span onclick="goIssueNew()">새 보증서 발행</span>
+     <span onclick="toggleIssuedMore()" aria-label="더보기">⋯</span>
     </div>
-    <div class="actions noPrint" style="margin-top:18px">
-     <button class="btn" onclick="show('admin')">보증서 목록</button>
-     <button class="btn dark" onclick="goIssueNew()">새 보증서 발행</button>
+    <div class="issuedMore hidden noPrint" id="issued-more">
+     <div class="sharebox" style="text-align:left">
+      <b>고객용 보증서 링크</b><br><span class="muted">고객 전달용 전용 주소</span>
+      <div style="margin-top:7px"><code id="issued-shareUrl"></code></div>
+     </div>
+     <div class="issuedActions">
+      <button class="btn" onclick="copyIssuedShare()">링크 복사</button>
+      <button class="btn" onclick="smsIssuedShare()">문자 발송</button>
+      <button class="btn" onclick="printJustIssued()">PDF 저장</button>
+     </div>
     </div>
    </div>
   </div>
@@ -2983,13 +2990,23 @@ async function removeWarranty(id){
 function renderIssued(w){
  document.getElementById("issued-no").textContent=w.no;
  document.getElementById("issued-shareUrl").textContent=buildShareUrl(w);
- 
- const statusEl = document.getElementById("issued-kakao-status");
+ document.getElementById("issued-more").classList.add("hidden");
+
+ const checkEl = document.getElementById("issued-check");
+ const headlineEl = document.getElementById("issued-headline");
+ const subEl = document.getElementById("issued-sub");
  if(w.kakaoStatus === "발송 완료"){
-   statusEl.innerHTML = `<span class="pill kakao-done">💬 모바일 알림톡 자동 발송 완료</span>`;
+   checkEl.classList.remove("issuedCheckWait");
+   headlineEl.innerHTML = "카카오톡 알림톡<br>자동 발송 완료";
+   subEl.textContent = "고객님께 보증서가 자동으로 전달되었습니다";
  } else {
-   statusEl.innerHTML = `<span class="pill kakao-wait">💬 알림톡 미발송</span>`;
+   checkEl.classList.add("issuedCheckWait");
+   headlineEl.textContent = "보증서 발행 완료";
+   subEl.textContent = "알림톡이 발송되지 않았어요 — 아래 ⋯에서 링크를 직접 전달해주세요";
  }
+}
+function toggleIssuedMore(){
+ document.getElementById("issued-more").classList.toggle("hidden");
 }
 
 function openIssuedCustomerView(){
