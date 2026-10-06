@@ -1138,7 +1138,11 @@ const TESLA_VEHICLE_CLASSES=[
 function vehicleClassesFor(track){return track==="tesla"?TESLA_VEHICLE_CLASSES:VEHICLE_CLASSES}
 function allVehicleClasses(){return [...VEHICLE_CLASSES,...TESLA_VEHICLE_CLASSES]}
 const ADDON_PRICE_MAP={"썬팅":150000,"PPF":200000,"유리막 코팅":250000,"가죽 코팅":200000,"유리 발수 코팅":80000,"블랙박스":150000,"기본서비스":0};
-function pkgAddonList(){return getCategories().filter(c=>!["기본서비스","썬팅","유리막 코팅","가죽 코팅"].includes(c)).map(c=>({category:c,extra:(ADDON_PRICE_MAP[c]??150000)}))}
+function pkgAddonList(){
+ const list=getCategories().filter(c=>!["기본서비스","썬팅","유리막 코팅","가죽 코팅","발수코팅"].includes(c)).map(c=>({category:c,extra:(ADDON_PRICE_MAP[c]??150000)}));
+ list.push({category:"하이패스",extra:70000});
+ return list;
+}
 /* PPF 추가 옵션을 체크하면 아래 부위별 목록 중에서 직접 골라 담을 수 있고, 가격은 고른 부위들의 합산으로 계산됩니다. */
 const PPF_PART_PRICE_MAP={
  "디스플레이":30000,
