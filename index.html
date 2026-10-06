@@ -2859,6 +2859,20 @@ function certDocInnerHtml(w, shop, precautions, t){
    <div class="certFooter">${esc(footerText).replace(/\n/g," · ")}</div>
   </div>`;
 }
+// 카카오톡 안에서 링크를 눌러 열리는 인앱 브라우저는 인쇄(window.print) 같은 기능을 지원하지 않는 경우가 많아,
+// 이 경우를 감지해서 외부 브라우저로 전환하도록 안내합니다.
+function isKakaoInApp(){ return /KAKAOTALK/i.test(navigator.userAgent||""); }
+function openInExternalBrowser(){
+ location.href="kakaotalk://web/openExternal?url="+encodeURIComponent(location.href);
+}
+function printCertificate(){
+ if(isKakaoInApp()){
+  openInExternalBrowser();
+  setTimeout(()=>{ alert("카카오톡 화면 오른쪽 위 '···' 메뉴에서 '다른 브라우저로 열기'를 눌러주시면 인쇄/PDF 저장이 가능합니다."); },600);
+  return;
+ }
+ window.print();
+}
 function renderDetail(w){
  if(!w)return;
  const shop = w.shopInfo || DEFAULT_SUPER_SHOP;
@@ -2880,7 +2894,9 @@ function renderDetail(w){
   <button class="btn danger" onclick="removeWarranty(${w.id})">🗑️ 보증서 삭제</button>`:"";
  // 고객이 공유링크로 직접 들어온 경우에는 매장 관리용 정보(알림톡 발송상태, 고객용 링크 복사 등)는 보여주지 않고
  // 보증서 내용 + PDF저장/인쇄 버튼만 보이게 합니다.
+ const kakaoInAppNotice=(!isAdminAuthed()&&isKakaoInApp())?`<div class="notice noPrint" style="margin-bottom:14px">카카오톡 안에서 보고 계세요. 인쇄/PDF 저장을 하려면 아래 버튼으로 외부 브라우저로 열어주세요.</div>`:"";
  document.getElementById("detail").innerHTML=`
+ ${kakaoInAppNotice}
  <div class="certPrintPage">
  <div class="certDoc">
   ${certDocInnerHtml(w, shop, precautions, t)}
@@ -2888,7 +2904,7 @@ function renderDetail(w){
  </div>
  ${adminExtras}
  <div class="actions noPrint">
-  <button class="btn" onclick="window.print()">PDF 저장 / 인쇄</button>
+  <button class="btn" onclick="printCertificate()">PDF 저장 / 인쇄</button>
   ${adminActions}
  </div>`;
  if(isAdminAuthed())document.getElementById("shareUrl").textContent=buildShareUrl(w);
