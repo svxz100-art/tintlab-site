@@ -2244,12 +2244,28 @@ window.addEventListener("popstate", function(e){
 
 async function sendKakaoAlimtalk(w) {
   try {
+    if(!sb) throw new Error("DB 연결을 사용할 수 없습니다.");
+    const shop = w.shopInfo || getCurrentShopInfo();
+    const { error } = await sb.functions.invoke("send-alimtalk", {
+      body: {
+        phone: w.phone,
+        customer: w.customer,
+        no: w.no,
+        shopName: shop.shopName,
+        shopAddress: shop.address,
+        shopPhone: shop.phone,
+        amount: w.amount
+      }
+    });
+    if(error) throw error;
     w.kakaoStatus = "발송 완료";
     const now = new Date();
     w.kakaoSentAt = fmt(now) + " " + String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
     return true;
   } catch(e) {
+    console.error("sendKakaoAlimtalk", e);
     w.kakaoStatus = "미발송";
+    w.kakaoSentAt = "";
     return false;
   }
 }
@@ -2328,11 +2344,14 @@ async function issue(){
  };
  if(superNoOverride)w.no=superNoOverride; // 지정하지 않으면 DB가 자동으로 고유 번호를 발급합니다.
 
- await sendKakaoAlimtalk(w);
-
  const {data:savedRow,error:insertErr}=await dbInsertWarranty(w);
  if(insertErr){ err.textContent="발행 중 오류가 발생했습니다: "+insertErr.message; err.style.display="block"; return; }
  w=savedRow;
+
+ // 보증서 번호가 DB에서 막 발급된 뒤(w.no 확정 후)에 알림톡을 보내야 공유링크/번호가 정확합니다.
+ await sendKakaoAlimtalk(w);
+ const kakaoSaveErr = await dbUpdateWarranty(w);
+ if(kakaoSaveErr) console.error("카카오 발송 상태 저장 실패", kakaoSaveErr);
 
  warranties.unshift(w);selected=w;clearForm();renderIssued(w);show("issued");
 }
