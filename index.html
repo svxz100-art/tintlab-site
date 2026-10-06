@@ -141,7 +141,8 @@ main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .certTagline{text-align:center;font-size:8.5px;letter-spacing:.3em;text-transform:uppercase;color:#999;margin:5px 0 0}
 .certLabel{font-size:11px;color:#888;margin-bottom:3px}.certValue{font-size:13px;font-weight:700;color:#171717}
 @media(max-width:720px){.certGrid2{grid-template-columns:1fr}}
-.section{margin-top:24px}.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px}.sectionTitle h2{font-size:18px;margin:0;letter-spacing:-.03em}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:0;padding:19px}.formCard{max-width:760px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:0;padding:24px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.field{margin-bottom:13px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}.field input,.field textarea,.field select{width:100%;padding:12px;border:1px solid var(--line);border-radius:0;outline:0;background:var(--bg);color:var(--ink)}.field input:focus,.field textarea:focus{border-color:var(--accent)}.full{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.actions .btn{flex:1;min-width:120px}.notice{font-size:12px;padding:10px 12px;border-radius:0;background:var(--soft);color:var(--muted);margin-bottom:14px;border:1px solid var(--line)}.error{color:var(--danger);font-size:12px;margin:8px 0;display:none}
+.section{margin-top:24px}.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px}.sectionTitle h2{font-size:18px;margin:0;letter-spacing:-.03em}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:0;padding:19px}.formCard{max-width:760px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:0;padding:24px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.field{margin-bottom:13px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}.field input,.field textarea,.field select{width:100%;padding:12px;border:1px solid var(--line);border-radius:0;outline:0;background:var(--bg);color:var(--ink)}.field input:focus,.field textarea:focus{border-color:var(--accent)}
+#pkg-date{color-scheme:dark;cursor:pointer}#pkg-date::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer}.full{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.actions .btn{flex:1;min-width:120px}.notice{font-size:12px;padding:10px 12px;border-radius:0;background:var(--soft);color:var(--muted);margin-bottom:14px;border:1px solid var(--line)}.error{color:var(--danger);font-size:12px;margin:8px 0;display:none}
 .list{display:grid;gap:9px}.wcard{background:var(--card);border:1px solid var(--line);border-radius:0;padding:15px;display:flex;justify-content:space-between;align-items:center;gap:14px;cursor:pointer}.wcard:hover{border-color:var(--accent)}.wmain{min-width:0}.wno{font-size:11px;color:var(--muted)}.wtitle{font-weight:700;margin:3px 0}.wsub{font-size:12px;color:var(--muted)}.pill{font-size:11px;padding:5px 9px;border-radius:999px;background:rgba(74,222,128,.14);color:var(--ok);white-space:nowrap}
 .pill.kakao-done{background:#fee500;color:#000;font-weight:700}.pill.kakao-wait{background:var(--soft);color:var(--muted)}.pill.pay-pending{background:rgba(255,122,94,.16);color:var(--accent-text);font-weight:700}.pill.pay-fail{background:rgba(255,107,94,.16);color:var(--danger);font-weight:700}
 .pill.badge-super{background:rgba(201,164,255,.14);color:var(--super);font-weight:700;border:1px solid rgba(201,164,255,.4)}
@@ -402,6 +403,16 @@ main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .branchMapBox iframe{width:100%;height:100%;border:0;display:block}
 .pkgAddonRow{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:0;padding:12px 14px;font-size:13px;cursor:pointer;background:var(--card);color:var(--ink)}
 .pkgAddonRow .pkgAddPrice{margin:0 0 0 auto}
+.pkgPpfPicker{border:1px solid var(--line);border-top:0;padding:12px 14px 14px;background:var(--soft)}
+.pkgPpfPartList{display:grid;gap:6px;margin-bottom:10px}
+.pkgPpfPartRow{display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--card);border:1px solid var(--line);padding:8px 10px}
+.pkgPpfPartRow span:first-child{flex:1}
+.pkgPpfPartRow span:nth-child(2){color:var(--muted)}
+.pkgPpfPartRemove{border:0;background:transparent;color:var(--muted);font-size:15px;cursor:pointer;line-height:1;padding:0 2px}
+.pkgPpfPartRemove:hover{color:var(--danger)}
+.pkgPpfAddRow{display:flex;gap:8px}
+.pkgPpfAddRow select{flex:1;padding:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12.5px}
+.pkgPpfAddRow .btn{flex:0 0 auto;padding:10px 14px;font-size:12.5px}
 .pkgAgree{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin:14px 0 4px;cursor:pointer}
 .pkgSummary{background:var(--soft);border-radius:0;padding:16px;margin-top:18px;border:1px solid var(--line)}
 .pkgSummaryRow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);padding:4px 0}
@@ -703,7 +714,7 @@ function getGalleryShortTitle(){
   <input type="hidden" id="f-edit-id">
   <div class="row">
    <div class="field"><label>고객명 *</label><input id="f-customer" placeholder="예: 홍길동"></div>
-   <div class="field"><label>고객 연락처 *</label><input id="f-phone" placeholder="예: 010-1234-5678"></div>
+   <div class="field"><label>고객 연락처 *</label><input id="f-phone" placeholder="예: 010-1234-5678" oninput="formatPhoneInput(this)"></div>
    <div class="field"><label>차대번호 *</label><input id="f-vin" placeholder="예: KMHXX00XXXX000000"></div>
    <div class="field"><label>시공 차종 *</label><input id="f-model" placeholder="예: 제네시스 GV70"></div>
    <div class="field"><label>차량번호</label><input id="f-vehicle" placeholder="선택 입력"></div>
@@ -883,7 +894,7 @@ function getGalleryShortTitle(){
       <div class="field" style="margin-bottom:8px"><label>상호명 (가맹점명) *</label><input id="new-m-shop" placeholder="예: 틴트랩 남부법원점"></div>
       <div class="field" style="margin-bottom:8px"><label>사업자등록번호 *</label><input id="new-m-bizno" placeholder="예: 123-45-67890"></div>
       <div class="field" style="margin-bottom:8px"><label>대표자 성함 *</label><input id="new-m-owner" placeholder="예: 홍길동"></div>
-      <div class="field" style="margin-bottom:8px"><label>대표 연락처 *</label><input id="new-m-phone" placeholder="예: 010-1234-5678"></div>
+      <div class="field" style="margin-bottom:8px"><label>대표 연락처 *</label><input id="new-m-phone" placeholder="예: 010-1234-5678" oninput="formatPhoneInput(this)"></div>
       <div class="field" style="margin-bottom:8px"><label>매장 주소 *</label><input id="new-m-address" placeholder="예: 서울특별시 양천구 신월로36길 9"></div>
     </div>
     <button class="btn super" style="width:100%;margin-top:6px" onclick="addMemberAccount()">+ 신규 가맹 회원계정 생성하기</button>
@@ -1112,6 +1123,23 @@ function vehicleClassesFor(track){return track==="tesla"?TESLA_VEHICLE_CLASSES:V
 function allVehicleClasses(){return [...VEHICLE_CLASSES,...TESLA_VEHICLE_CLASSES]}
 const ADDON_PRICE_MAP={"썬팅":150000,"PPF":200000,"유리막 코팅":250000,"가죽 코팅":200000,"유리 발수 코팅":80000,"블랙박스":150000,"기본서비스":0};
 function pkgAddonList(){return getCategories().filter(c=>!["기본서비스","썬팅","유리막 코팅","가죽 코팅"].includes(c)).map(c=>({category:c,extra:(ADDON_PRICE_MAP[c]??150000)}))}
+/* PPF 추가 옵션을 체크하면 아래 부위별 목록 중에서 직접 골라 담을 수 있고, 가격은 고른 부위들의 합산으로 계산됩니다. */
+const PPF_PART_PRICE_MAP={
+ "디스플레이":30000,
+ "디스플레이 (무광)":50000,
+ "공조기 패널":30000,
+ "공조기 패널 (무광)":50000,
+ "데이라이트 추가":50000,
+ "헤드라이트":100000,
+ "A필러":150000,
+ "B, C필러":150000,
+ "싼타페 D필러":50000,
+ "사이드미러":150000,
+ "범퍼 FRONT 사이드 2P":200000,
+ "범퍼 REAR 사이드 2P":200000,
+ "실내 PPF":300000
+};
+function pkgPpfPartsTotal(){return pkgWizard.ppfParts.reduce((s,n)=>s+(PPF_PART_PRICE_MAP[n]||0),0)}
 
 // ⚠️ 실 결제 연동 안내: 아래 클라이언트 키는 Toss Payments 공식 "테스트" 키입니다.
 // 실제 결제를 받으려면 Toss Payments 개발자센터에서 발급받은 "라이브" 클라이언트 키로 교체해야 합니다.
@@ -1121,7 +1149,7 @@ function pkgAddonList(){return getCategories().filter(c=>!["기본서비스","�
 const TOSS_CLIENT_KEY="test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq";
 const TOSS_CONFIRM_API_URL="";
 
-let pkgWizard={step:1,track:"normal",packageId:null,region:"",district:"",branchId:"",vehicleClass:"standard",addons:[],tintFilm:"",tintFront:"",tintSide1:"",tintSide2:"",tintRear:"",model3Heatline:false};
+let pkgWizard={step:1,track:"normal",packageId:null,region:"",district:"",branchId:"",vehicleClass:"standard",addons:[],tintFilm:"",tintFront:"",tintSide1:"",tintSide2:"",tintRear:"",model3Heatline:false,ppfParts:[]};
 const KOREA_REGION_MAP={"서울":"서울","부산":"부산","대구":"대구","인천":"인천","광주":"광주","대전":"대전","울산":"울산","세종":"세종","경기":"경기","강원":"강원","충북":"충북","충청북":"충북","충남":"충남","충청남":"충남","전북":"전북","전라북":"전북","전남":"전남","전라남":"전남","경북":"경북","경상북":"경북","경남":"경남","경상남":"경남","제주":"제주"};
 function guessRegion(address){
  const a=String(address||"");
@@ -1139,7 +1167,7 @@ function getPkgBranches(){
 function resetPkgWizard(){
  const branches=getPkgBranches();
  const first=branches[0];
- pkgWizard={step:1,track:"normal",packageId:null,region:first?first.region:"",district:first?first.district:"",branchId:first?first.id:"",vehicleClass:"standard",addons:[],tintFilm:"",tintFront:"",tintSide1:"",tintSide2:"",tintRear:"",model3Heatline:false};
+ pkgWizard={step:1,track:"normal",packageId:null,region:first?first.region:"",district:first?first.district:"",branchId:first?first.id:"",vehicleClass:"standard",addons:[],tintFilm:"",tintFront:"",tintSide1:"",tintSide2:"",tintRear:"",model3Heatline:false,ppfParts:[]};
 }
 function pkgSelectedTier(){return getPackageTiers(pkgWizard.track).find(t=>t.id===pkgWizard.packageId)}
 function pkgCalcTotal(){
@@ -1148,7 +1176,10 @@ function pkgCalcTotal(){
  const vClasses=vehicleClassesFor(pkgWizard.track);
  const vClass=vClasses.find(v=>v.id===pkgWizard.vehicleClass)||vClasses[0];
  const list=pkgAddonList();
- const addonTotal=pkgWizard.addons.reduce((s,cat)=>{const a=list.find(x=>x.category===cat);return s+(a?a.extra:0)},0);
+ const addonTotal=pkgWizard.addons.reduce((s,cat)=>{
+  if(cat==="PPF")return s+pkgPpfPartsTotal();
+  const a=list.find(x=>x.category===cat);return s+(a?a.extra:0);
+ },0);
  const tintExtra=tintFilmPrice(pkgWizard.tintFilm);
  const heatlineApplicable=pkgWizard.track==="tesla"&&pkgWizard.vehicleClass==="model3"&&pkgWizard.model3Heatline;
  const heatlinePrice=heatlineApplicable?model3HeatlinePrice(pkgWizard.tintFilm):null;
@@ -1875,7 +1906,7 @@ function renderConsultEditor(){
 
     <h4 class="pe-section-h">고객 정보</h4>
     <label>고객명</label><input id="cs-name" value="${esc(CONSULT_STATE.customerName||"")}" oninput="consultUpdatePreview()">
-    <label>연락처</label><input id="cs-phone" value="${esc(CONSULT_STATE.customerPhone||"")}" oninput="consultUpdatePreview()">
+    <label>연락처</label><input id="cs-phone" value="${esc(CONSULT_STATE.customerPhone||"")}" oninput="formatPhoneInput(this);consultUpdatePreview()">
     <label>차종</label><input id="cs-vehicle" value="${esc(CONSULT_STATE.vehicleModel||"")}" oninput="consultUpdatePreview()">
 
     <h4 class="pe-section-h">구성 항목</h4>
@@ -2204,6 +2235,14 @@ async function dbDeleteWarranty(id){
 }
 function won(n){return Number(n||0).toLocaleString("ko-KR")+"원"}
 function norm(s){return String(s||"").replace(/[\s-]/g,"")}
+/* 전화번호 입력칸에 3자리-4자리-4자리 기준으로 "-"를 자동으로 넣어줍니다 (예: 010-1234-5678). */
+function formatPhoneInput(el){
+ const digits=el.value.replace(/[^0-9]/g,"").slice(0,11);
+ let formatted=digits;
+ if(digits.length>7)formatted=digits.slice(0,3)+"-"+digits.slice(3,7)+"-"+digits.slice(7);
+ else if(digits.length>3)formatted=digits.slice(0,3)+"-"+digits.slice(3);
+ el.value=formatted;
+}
 function fmt(d){return d.getFullYear()+"."+String(d.getMonth()+1).padStart(2,"0")+"."+String(d.getDate()).padStart(2,"0")}
 function status(w){return new Date(w.expire.replaceAll(".","-")+"T23:59:59")>=new Date()?"보증 중":"기간 만료"}
 /* "2026.09.21" <-> <input type="date">가 쓰는 "2026-09-21" 형식 변환 (슈퍼관리자 보증서 날짜/번호 수정용) */
@@ -3318,6 +3357,36 @@ function densityOptionsFor(filmItem){
  return DEFAULT_DENSITY_OPTIONS;
 }
 
+/* 추가 시공 옵션 한 줄을 그려줍니다. PPF는 전체 부위 중 시공할 부위를 직접 골라 담는 전용 UI를 함께 보여줍니다. */
+function pkgAddonRowHtml(a){
+ if(a.category!=="PPF"){
+  return `
+   <label class="pkgAddonRow">
+    <input type="checkbox" ${pkgWizard.addons.includes(a.category)?'checked':''} onchange="pkgToggleAddon('${esc(a.category)}')">
+    <span>${esc(a.category)} 추가</span><span class="pkgAddPrice">+${won(a.extra)}</span>
+   </label>`;
+ }
+ const checked=pkgWizard.addons.includes("PPF");
+ const subtotal=pkgPpfPartsTotal();
+ const availableParts=Object.keys(PPF_PART_PRICE_MAP).filter(n=>!pkgWizard.ppfParts.includes(n));
+ const picker=checked?`
+  <div class="pkgPpfPicker">
+   ${pkgWizard.ppfParts.length?`<div class="pkgPpfPartList">
+    ${pkgWizard.ppfParts.map(n=>`<div class="pkgPpfPartRow"><span>${esc(n)}</span><span>${won(PPF_PART_PRICE_MAP[n]||0)}</span><button type="button" class="pkgPpfPartRemove" onclick="pkgRemovePpfPart('${esc(n)}')">×</button></div>`).join('')}
+   </div>`:`<div class="muted" style="font-size:11.5px;margin-bottom:8px">시공할 부위를 선택해서 추가해주세요.</div>`}
+   ${availableParts.length?`
+   <div class="pkgPpfAddRow">
+    <select id="pkg-ppf-select">${availableParts.map(n=>`<option value="${esc(n)}">${esc(n)} (+${won(PPF_PART_PRICE_MAP[n])})</option>`).join('')}</select>
+    <button type="button" class="btn" onclick="pkgAddPpfPart()">+ 추가</button>
+   </div>`:''}
+  </div>`:'';
+ return `
+  <label class="pkgAddonRow">
+   <input type="checkbox" ${checked?'checked':''} onchange="pkgToggleAddon('PPF')">
+   <span>PPF 추가</span><span class="pkgAddPrice">${checked?`+${won(subtotal)}`:'부위 선택형'}</span>
+  </label>
+  ${picker}`;
+}
 function pkgStep2Html(){
  const branches=getPkgBranches();
  const regions=[...new Set(branches.map(b=>b.region))];
@@ -3377,12 +3446,7 @@ function pkgStep2Html(){
 
   <div class="pkgSectionTitle" style="margin-top:22px">${showHeatline?5:4}) 추가 시공 옵션 (선택)</div>
   <div class="pkgAddonList">
-   ${addons.length?addons.map(a=>`
-    <label class="pkgAddonRow">
-     <input type="checkbox" ${pkgWizard.addons.includes(a.category)?'checked':''} onchange="pkgToggleAddon('${esc(a.category)}')">
-     <span>${esc(a.category)} 추가</span><span class="pkgAddPrice">+${won(a.extra)}</span>
-    </label>
-   `).join(''):'<div class="muted">등록된 추가 옵션이 없습니다.</div>'}
+   ${addons.length?addons.map(a=>pkgAddonRowHtml(a)).join(''):'<div class="muted">등록된 추가 옵션이 없습니다.</div>'}
   </div>
 
   <div class="pkgNav"><button class="btn" onclick="pkgGoStep(1)">이전</button><button class="btn dark" onclick="pkgGoStep(3)">다음 단계</button></div>
@@ -3412,32 +3476,49 @@ function pkgSetVehicle(id){ pkgWizard.vehicleClass=id; if(id!=="model3")pkgWizar
 function pkgToggleModel3Heatline(){ pkgWizard.model3Heatline=!pkgWizard.model3Heatline; renderPkgStep(); }
 function pkgToggleAddon(cat){
  const i=pkgWizard.addons.indexOf(cat);
- if(i===-1)pkgWizard.addons.push(cat); else pkgWizard.addons.splice(i,1);
+ if(i===-1)pkgWizard.addons.push(cat); else {pkgWizard.addons.splice(i,1); if(cat==="PPF")pkgWizard.ppfParts=[];}
+ renderPkgStep();
+}
+function pkgAddPpfPart(){
+ const sel=document.getElementById('pkg-ppf-select');
+ if(!sel||!sel.value)return;
+ if(!pkgWizard.ppfParts.includes(sel.value))pkgWizard.ppfParts.push(sel.value);
+ renderPkgStep();
+}
+function pkgRemovePpfPart(name){
+ pkgWizard.ppfParts=pkgWizard.ppfParts.filter(n=>n!==name);
  renderPkgStep();
 }
 
-function pkgDefaultDensity(opts,prefer){ return opts.includes(prefer)?prefer:(opts[Math.min(1,opts.length-1)]||opts[0]); }
+/* 필름이 가진 농도 목록 중 24~35% 범위에 해당하는 값을 기본값으로 고르고, 없으면 그 범위에 가장 가까운 값을 고른다. */
+function pkgDefaultDensityInRange(opts,lo,hi){
+ lo=lo||24; hi=hi||35;
+ const nums=opts.map(d=>({d,n:parseInt(d,10)}));
+ const inRange=nums.find(x=>x.n>=lo&&x.n<=hi);
+ if(inRange)return inRange.d;
+ const mid=(lo+hi)/2;
+ return nums.reduce((best,cur)=>Math.abs(cur.n-mid)<Math.abs(best.n-mid)?cur:best,nums[0]).d;
+}
 function pkgStep3Html(){
  const c=pkgCalcTotal();
  const tier=pkgSelectedTier();
  const addons=pkgAddonList();
  const densityOpts=densityOptionsFor(pkgWizard.tintFilm);
- const frontDefault=densityOpts[0];
- const sideRearDefault=pkgDefaultDensity(densityOpts,"15%");
+ const defaultDensity=pkgDefaultDensityInRange(densityOpts);
  const densityOptHtml=(preferred)=>densityOpts.map(d=>`<option ${d===preferred?'selected':''}>${esc(d)}</option>`).join('');
  return `
   <div class="row">
    <div class="field"><label>시공 예약 일자 *</label><input type="date" id="pkg-date"></div>
    <div class="field"><label>예약자 성함 *</label><input id="pkg-name" placeholder="예: 홍길동"></div>
-   <div class="field"><label>연락처 *</label><input id="pkg-phone" placeholder="예: 010-1234-5678"></div>
+   <div class="field"><label>연락처 *</label><input id="pkg-phone" placeholder="예: 010-1234-5678" oninput="formatPhoneInput(this)"></div>
    <div class="field"><label>차종명 *</label><input id="pkg-vehicle" placeholder="예: 제네시스 GV70"></div>
   </div>
   ${pkgWizard.tintFilm?`<div class="muted" style="font-size:12px;margin:-6px 0 10px">선택한 썬팅 필름: <b style="color:var(--ink)">${esc(tintFilmLabel(pkgWizard.tintFilm))}</b> · 농도는 이 필름 기준으로만 선택 가능합니다.</div>`:''}
   <div class="row">
-   <div class="field"><label>전면 틴팅 농도</label><select id="pkg-tint-front">${densityOptHtml(frontDefault)}</select></div>
-   <div class="field"><label>1열 측면 틴팅 농도</label><select id="pkg-tint-side1">${densityOptHtml(sideRearDefault)}</select></div>
-   <div class="field"><label>2열 측면 틴팅 농도</label><select id="pkg-tint-side2">${densityOptHtml(sideRearDefault)}</select></div>
-   <div class="field"><label>후면 틴팅 농도</label><select id="pkg-tint-rear">${densityOptHtml(sideRearDefault)}</select></div>
+   <div class="field"><label>전면 틴팅 농도</label><select id="pkg-tint-front">${densityOptHtml(defaultDensity)}</select></div>
+   <div class="field"><label>1열 측면 틴팅 농도</label><select id="pkg-tint-side1">${densityOptHtml(defaultDensity)}</select></div>
+   <div class="field"><label>2열 측면 틴팅 농도</label><select id="pkg-tint-side2">${densityOptHtml(defaultDensity)}</select></div>
+   <div class="field"><label>후면 틴팅 농도</label><select id="pkg-tint-rear">${densityOptHtml(defaultDensity)}</select></div>
    <div class="field full"><label>요청사항</label><textarea id="pkg-note" rows="3" placeholder="요청사항을 입력해주세요"></textarea></div>
   </div>
 
@@ -3450,10 +3531,10 @@ function pkgStep3Html(){
    ${c.vehicle?`<div class="pkgSummaryRow"><span>차종 옵션</span><span>+${won(c.vehicle)}</span></div>`:''}
    ${pkgWizard.model3Heatline?`<div class="pkgSummaryRow"><span>모델3 열선 통시공</span><span>${c.heatlineQuote?'별도문의':`+${won(c.heatline)}`}</span></div>`:''}
    ${pkgWizard.addons.map(cat=>`<div class="pkgSummaryRow"><span>${esc(cat)} 추가</span><span>+${won((addons.find(a=>a.category===cat)||{}).extra||0)}</span></div>`).join('')}
-   <div class="pkgSummaryTotal"><span>결제 금액</span><b>${won(c.total)}</b></div>
+   <div class="pkgSummaryTotal"><span>예상 금액</span><b>${won(c.total)}</b></div>
   </div>
 
-  <div class="pkgNav"><button class="btn" onclick="pkgGoStep(2)">이전</button><button class="btn dark" style="flex:2" onclick="pkgSubmitAndPay()">${won(c.total)} 결제하기</button></div>
+  <div class="pkgNav"><button class="btn" onclick="pkgGoStep(2)">이전</button><button class="btn dark" style="flex:2" onclick="pkgSubmitAndPay()">예약 신청하기</button></div>
  `;
 }
 
@@ -3474,11 +3555,6 @@ async function pkgSubmitAndPay(){
  if(pkgCalcTotal().heatlineQuote){ err.textContent="선택하신 필름은 모델3 열선 통시공 추가금이 아직 등록되지 않았습니다. 매장에 문의 후 진행해주세요."; err.style.display="block"; return; }
  err.style.display="none";
 
- if(typeof TossPayments==="undefined"){
-  alert("결제 모듈을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.");
-  return;
- }
-
  const branches=getPkgBranches();
  const branch=branches.find(b=>b.id===pkgWizard.branchId)||branches[0];
  const tier=pkgSelectedTier();
@@ -3490,35 +3566,25 @@ async function pkgSubmitAndPay(){
   packageId:tier.id, packageName:tier.name,
   branchId:branch.id, branchName:branch.shopName,
   vehicleClass:pkgWizard.vehicleClass,
-  addons:[...pkgWizard.addons],
+  addons:[...pkgWizard.addons], ppfParts:[...pkgWizard.ppfParts],
   basePrice:c.base, addonTotal:c.addon, vehicleExtra:c.vehicle, tintExtra:c.tint, totalPrice:c.total,
   model3Heatline:pkgWizard.model3Heatline, heatlineExtra:c.heatline,
   reservationDate:date, customerName:name, customerPhone:phone, vehicleModel:vehicle,
   tintFilm:tintFilmLabel(pkgWizard.tintFilm), tintFront, tintSide1, tintSide2, tintRear, requestNote:note,
   agreedTerms:true,
-  paymentStatus:"결제대기",
+  // 결제 연동(토스페이먼츠) 없이, 예약 신청만 접수해서 관리자가 확인 후 직접 연락하는 방식으로 운영합니다.
+  // (토스 연동 코드/필드는 나중에 다시 쓸 수 있도록 그대로 남겨둡니다.)
+  paymentStatus:"예약 확인중",
   orderId:"", paymentKey:"", paidAmount:0,
   createdAt:fmt(new Date())
  };
- reservation.orderId="TL"+reservation.id;
  list.unshift(reservation); saveReservations(list);
 
- try{
-  const toss=TossPayments(TOSS_CLIENT_KEY);
-  const payment=toss.payment({customerKey:String(reservation.id)});
-  await payment.requestPayment({
-   method:"CARD",
-   amount:{currency:"KRW", value:c.total},
-   orderId:reservation.orderId,
-   orderName:tier.name+" 예약",
-   successUrl:location.origin+location.pathname+"?flow=pkgpay&rid="+reservation.id,
-   failUrl:location.origin+location.pathname+"?flow=pkgpayfail&rid="+reservation.id,
-   customerName:name,
-   customerMobilePhone:norm(phone)
-  });
- }catch(e){
-  console.error(e);
-  alert("결제 요청 중 문제가 발생했습니다. 다시 시도해주세요.");
+ const box=document.getElementById('package-page-content');
+ if(box){
+  box.classList.add('hasWizard');
+  box.innerHTML=`<div class="pkgWizard">${pkgResultHtml(true,reservation)}</div>`;
+  box.scrollIntoView({behavior:"smooth",block:"start"});
  }
 }
 
@@ -3567,20 +3633,18 @@ function pkgResultHtml(success, r){
  if(!success){
   return `<div class="pkgResult fail"><div class="pkgResultIcon">✕</div><h2>결제가 완료되지 않았습니다</h2><p>결제가 취소되었거나 오류가 발생했습니다. 다시 시도해주세요.</p><button class="btn dark" onclick="show('package')">다시 시도하기</button></div>`;
  }
- const pending=reservationIsPending(r);
- const pendingNote=pending?`<div class="notice" style="margin-top:14px;text-align:left">⚠️ 결제 승인 서버가 아직 연결되어 있지 않아 최종 승인 확인이 자동으로 이루어지지 않았습니다. Toss Payments 가맹점 콘솔에서 결제 내역을 확인해주세요.</div>`:"";
  return `
   <div class="pkgResult ok">
    <div class="pkgResultIcon">✓</div>
    <h2>예약이 접수되었습니다</h2>
+   <p class="muted" style="margin:6px 0 0">믿고 예약해주셔서 감사합니다.<br>예약 확정을 위해 담당자가 빠른 시일 내에 연락드리겠습니다.</p>
    <div class="issuedNo">${esc(r.no)}</div>
    <div class="certGrid2" style="text-align:left;margin-top:14px">
     <div><div class="certLabel">패키지</div><div class="certValue">${esc(r.packageName)}</div></div>
     <div><div class="certLabel">지점</div><div class="certValue">${esc(r.branchName)}</div></div>
     <div><div class="certLabel">예약일자</div><div class="certValue">${esc(r.reservationDate)}</div></div>
-    <div><div class="certLabel">결제금액</div><div class="certValue">${won(r.paidAmount)}</div></div>
+    <div><div class="certLabel">예상 금액</div><div class="certValue">${won(r.paidAmount||r.totalPrice)}</div></div>
    </div>
-   ${pendingNote}
    <button class="btn dark" style="margin-top:18px" onclick="show('package')">확인</button>
   </div>`;
 }
@@ -3993,9 +4057,9 @@ function openReservationDetail(id){
   <div class="muted" style="margin-bottom:14px">${esc(r.no)}</div>
   <div class="certGrid2" style="text-align:left">
    <div><div class="certLabel">지점</div><div class="certValue">${esc(r.branchName)}</div></div>
-   <div><div class="certLabel">결제상태</div><div class="certValue"><span class="${reservationStatusPillClass(r.paymentStatus)}">${esc(r.paymentStatus)}</span></div></div>
+   <div><div class="certLabel">예약 상태</div><div class="certValue"><span class="${reservationStatusPillClass(r.paymentStatus)}">${esc(r.paymentStatus)}</span></div></div>
    <div><div class="certLabel">예약일자</div><div class="certValue">${esc(r.reservationDate)}</div></div>
-   <div><div class="certLabel">결제금액</div><div class="certValue">${won(r.totalPrice)}</div></div>
+   <div><div class="certLabel">예상 금액</div><div class="certValue">${won(r.totalPrice)}</div></div>
    <div><div class="certLabel">예약자</div><div class="certValue">${esc(r.customerName)}</div></div>
    <div><div class="certLabel">연락처</div><div class="certValue">${esc(r.customerPhone)}</div></div>
    <div><div class="certLabel">차종</div><div class="certValue">${esc(r.vehicleModel)}</div></div>
@@ -4006,11 +4070,12 @@ function openReservationDetail(id){
    <div><div class="certLabel">2열 측면 틴팅</div><div class="certValue">${esc(r.tintSide2||"-")}</div></div>
    <div><div class="certLabel">후면 틴팅</div><div class="certValue">${esc(r.tintRear||"-")}</div></div>
    <div><div class="certLabel">추가 옵션</div><div class="certValue">${r.addons&&r.addons.length?esc(r.addons.join(" / ")):"-"}</div></div>
+   ${r.ppfParts&&r.ppfParts.length?`<div class="certSpan2"><div class="certLabel">PPF 추가 부위</div><div class="certValue">${esc(r.ppfParts.join(" / "))}</div></div>`:""}
    ${r.model3Heatline?`<div><div class="certLabel">모델3 열선 통시공</div><div class="certValue">${r.heatlineExtra?won(r.heatlineExtra):"별도문의"}</div></div>`:""}
    <div class="certSpan2"><div class="certLabel">요청사항</div><div class="certValue">${esc(r.requestNote||"-")}</div></div>
-   <div class="certSpan2"><div class="certLabel">Toss paymentKey</div><div class="certValue" style="word-break:break-all">${esc(r.paymentKey||"-")}</div></div>
+   ${r.paymentKey?`<div class="certSpan2"><div class="certLabel">Toss paymentKey</div><div class="certValue" style="word-break:break-all">${esc(r.paymentKey)}</div></div>`:""}
   </div>
-  ${r.paymentStatus!=="결제완료"?`<div class="notice" style="margin-top:14px">Toss Payments 가맹점 콘솔에서 실제 결제 여부를 확인한 뒤 아래에서 상태를 직접 변경해주세요.</div>`:""}
+  ${r.paymentStatus!=="결제완료"?`<div class="notice" style="margin-top:14px">고객에게 연락해서 예약을 확정하고, 결제가 완료되면 아래에서 상태를 변경해주세요.</div>`:""}
   <div class="actions" style="margin-top:14px">
    <button class="btn" onclick="closeCommonModal()">닫기</button>
    ${r.paymentStatus!=="결제완료"?`<button class="btn super" onclick="setReservationStatus(${r.id},'결제완료')">결제완료로 변경</button>`:""}
