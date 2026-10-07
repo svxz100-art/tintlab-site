@@ -1160,8 +1160,23 @@ function pkgAddonList(){
  list.push({category:"하이패스",extra:70000});
  return list;
 }
-/* PPF 추가 옵션을 체크하면 아래 부위별 목록 중에서 직접 골라 담을 수 있고, 가격은 고른 부위들의 합산으로 계산됩니다. */
-const PPF_PART_PRICE_MAP={
+/* PPF 추가 옵션을 체크하면 아래 부위별 목록 중에서 직접 골라 담을 수 있고, 가격은 고른 부위들의 합산으로 계산됩니다. 신차패키지와 테슬라 전용은 목록이 서로 다릅니다. */
+const PPF_PART_PRICE_MAP_NORMAL={
+ "디스플레이":30000,
+ "디스플레이 (무광)":50000,
+ "공조기 패널":30000,
+ "공조기 패널 (무광)":50000,
+ "데이라이트 추가":50000,
+ "헤드라이트":100000,
+ "A필러":150000,
+ "B, C필러":150000,
+ "싼타페 D필러":50000,
+ "사이드미러":150000,
+ "범퍼 FRONT 사이드 2P":200000,
+ "범퍼 REAR 사이드 2P":200000,
+ "실내 PPF":300000
+};
+const PPF_PART_PRICE_MAP_TESLA={
  "디스플레이 (무광)":50000,
  "데이라이트 추가":50000,
  "헤드라이트":100000,
@@ -1170,7 +1185,8 @@ const PPF_PART_PRICE_MAP={
  "범퍼 REAR 사이드 2P":200000,
  "본넷 PPF":400000
 };
-function pkgPpfPartsTotal(){return pkgWizard.ppfParts.reduce((s,n)=>s+(PPF_PART_PRICE_MAP[n]||0),0)}
+function pkgPpfPartPriceMap(){return pkgWizard.track==="tesla"?PPF_PART_PRICE_MAP_TESLA:PPF_PART_PRICE_MAP_NORMAL}
+function pkgPpfPartsTotal(){const map=pkgPpfPartPriceMap();return pkgWizard.ppfParts.reduce((s,n)=>s+(map[n]||0),0)}
 
 // ⚠️ 실 결제 연동 안내: 아래 클라이언트 키는 Toss Payments 공식 "테스트" 키입니다.
 // 실제 결제를 받으려면 Toss Payments 개발자센터에서 발급받은 "라이브" 클라이언트 키로 교체해야 합니다.
@@ -3293,6 +3309,7 @@ function pkgSwitchTrack(track){
  pkgWizard.packageId=null;
  pkgWizard.vehicleClass=vehicleClassesFor(track)[0]?.id||"standard";
  pkgWizard.addons=[];
+ pkgWizard.ppfParts=[];
  pkgWizard.tintFilm="";pkgWizard.tintFront="";pkgWizard.tintSide1="";pkgWizard.tintSide2="";pkgWizard.tintRear="";
  pkgWizard.model3Heatline=false;
  renderPackagePage(true);
@@ -3409,15 +3426,16 @@ function pkgAddonRowHtml(a){
  }
  const checked=pkgWizard.addons.includes("PPF");
  const subtotal=pkgPpfPartsTotal();
- const availableParts=Object.keys(PPF_PART_PRICE_MAP).filter(n=>!pkgWizard.ppfParts.includes(n));
+ const ppfMap=pkgPpfPartPriceMap();
+ const availableParts=Object.keys(ppfMap).filter(n=>!pkgWizard.ppfParts.includes(n));
  const picker=checked?`
   <div class="pkgPpfPicker">
    ${pkgWizard.ppfParts.length?`<div class="pkgPpfPartList">
-    ${pkgWizard.ppfParts.map(n=>`<div class="pkgPpfPartRow"><span>${esc(n)}</span><span>${won(PPF_PART_PRICE_MAP[n]||0)}</span><button type="button" class="pkgPpfPartRemove" onclick="pkgRemovePpfPart('${esc(n)}')">×</button></div>`).join('')}
+    ${pkgWizard.ppfParts.map(n=>`<div class="pkgPpfPartRow"><span>${esc(n)}</span><span>${won(ppfMap[n]||0)}</span><button type="button" class="pkgPpfPartRemove" onclick="pkgRemovePpfPart('${esc(n)}')">×</button></div>`).join('')}
    </div>`:`<div class="muted" style="font-size:11.5px;margin-bottom:8px">시공할 부위를 선택해서 추가해주세요.</div>`}
    ${availableParts.length?`
    <div class="pkgPpfAddRow">
-    <select id="pkg-ppf-select">${availableParts.map(n=>`<option value="${esc(n)}">${esc(n)} (+${won(PPF_PART_PRICE_MAP[n])})</option>`).join('')}</select>
+    <select id="pkg-ppf-select">${availableParts.map(n=>`<option value="${esc(n)}">${esc(n)} (+${won(ppfMap[n])})</option>`).join('')}</select>
     <button type="button" class="btn" onclick="pkgAddPpfPart()">+ 추가</button>
    </div>`:''}
   </div>`:'';
