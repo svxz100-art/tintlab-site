@@ -142,7 +142,24 @@ main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .certLabel{font-size:11px;color:#888;margin-bottom:3px}.certValue{font-size:13px;font-weight:700;color:#171717}
 @media(max-width:720px){.certGrid2{grid-template-columns:1fr}}
 .section{margin-top:24px}.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px}.sectionTitle h2{font-size:18px;margin:0;letter-spacing:-.03em}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:0;padding:19px}.formCard{max-width:760px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:0;padding:24px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.field{margin-bottom:13px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}.field input,.field textarea,.field select{width:100%;padding:12px;border:1px solid var(--line);border-radius:0;outline:0;background:var(--bg);color:var(--ink)}.field input:focus,.field textarea:focus{border-color:var(--accent)}
-#pkg-date{color-scheme:dark;cursor:pointer;padding-right:38px}#pkg-date::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer}.pkgDateWrap{position:relative}.pkgDateIcon{position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:16px;opacity:.85}.full{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.actions .btn{flex:1;min-width:120px}.notice{font-size:12px;padding:10px 12px;border-radius:0;background:var(--soft);color:var(--muted);margin-bottom:14px;border:1px solid var(--line)}.error{color:var(--danger);font-size:12px;margin:8px 0;display:none}
+#pkg-date{cursor:pointer;padding-right:38px}.pkgDateWrap{position:relative}.pkgDateIcon{position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:16px;opacity:.85}
+.pkgDatePopup{position:absolute;top:calc(100% + 6px);left:0;z-index:50;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:14px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.pkgDatePopup.hidden{display:none}
+.pkgDateHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.pkgDateHead button{background:none;border:none;color:var(--ink);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1}
+.pkgDateHead button:hover{color:var(--accent-text)}
+.pkgDateTitle{font-weight:700;font-size:14px;color:var(--ink)}
+.pkgDateGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.pkgDateDow{font-size:11px;color:var(--muted);padding:4px 0}
+.pkgDateCell{font-size:13px;padding:7px 0;cursor:pointer;border-radius:4px;color:var(--ink)}
+.pkgDateCell:hover{background:var(--soft)}
+.pkgDateCell.pkgDateMuted{cursor:default}
+.pkgDateCell.pkgDateToday{border:1px solid var(--accent)}
+.pkgDateCell.pkgDateSelected{background:var(--accent);color:#fff;font-weight:700}
+.pkgDateFoot{display:flex;gap:8px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.pkgDateFoot button{flex:1;background:var(--soft);border:1px solid var(--line);color:var(--ink);padding:8px;border-radius:4px;cursor:pointer;font-size:12px}
+.pkgDateFoot button:hover{border-color:var(--accent)}
+.full{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.actions .btn{flex:1;min-width:120px}.notice{font-size:12px;padding:10px 12px;border-radius:0;background:var(--soft);color:var(--muted);margin-bottom:14px;border:1px solid var(--line)}.error{color:var(--danger);font-size:12px;margin:8px 0;display:none}
 .list{display:grid;gap:9px}.wcard{background:var(--card);border:1px solid var(--line);border-radius:0;padding:15px;display:flex;justify-content:space-between;align-items:center;gap:14px;cursor:pointer}.wcard:hover{border-color:var(--accent)}.wmain{min-width:0}.wno{font-size:11px;color:var(--muted)}.wtitle{font-weight:700;margin:3px 0}.wsub{font-size:12px;color:var(--muted)}.pill{font-size:11px;padding:5px 9px;border-radius:999px;background:rgba(74,222,128,.14);color:var(--ok);white-space:nowrap}
 .pill.kakao-done{background:#fee500;color:#000;font-weight:700}.pill.kakao-wait{background:var(--soft);color:var(--muted)}.pill.pay-pending{background:rgba(255,122,94,.16);color:var(--accent-text);font-weight:700}.pill.pay-fail{background:rgba(255,107,94,.16);color:var(--danger);font-weight:700}
 .pill.badge-super{background:rgba(201,164,255,.14);color:var(--super);font-weight:700;border:1px solid rgba(201,164,255,.4)}
@@ -1182,6 +1199,8 @@ function resetPkgWizard(){
  const branches=getPkgBranches();
  const first=branches[0];
  pkgWizard={step:1,track:"normal",packageId:null,region:first?first.region:"",district:first?first.district:"",branchId:first?first.id:"",vehicleClass:"standard",addons:[],tintFilm:"",tintFront:"",tintSide1:"",tintSide2:"",tintRear:"",model3Heatline:false,ppfParts:[]};
+ pkgDateSelectedISO="";
+ pkgDateView=null;
 }
 function pkgSelectedTier(){return getPackageTiers(pkgWizard.track).find(t=>t.id===pkgWizard.packageId)}
 function pkgCalcTotal(){
@@ -3512,6 +3531,83 @@ function pkgRemovePpfPart(name){
  renderPkgStep();
 }
 
+/* 시공 예약 일자 커스텀 달력 — 브라우저 기본 날짜 입력창 대신 직접 그리는 달력 팝업을 사용합니다. */
+let pkgDateSelectedISO="";
+let pkgDateView=null;
+function pkgDateISO(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function pkgToggleDatePicker(){
+ const popup=document.getElementById('pkg-date-popup');
+ if(!popup)return;
+ if(!popup.classList.contains('hidden')){ popup.classList.add('hidden'); return; }
+ const base=pkgDateSelectedISO?new Date(pkgDateSelectedISO+"T00:00:00"):new Date();
+ pkgDateView={y:base.getFullYear(),m:base.getMonth()};
+ pkgRenderDateCalendar();
+ popup.classList.remove('hidden');
+}
+function pkgDateShiftMonth(delta){
+ pkgDateView.m+=delta;
+ if(pkgDateView.m<0){ pkgDateView.m=11; pkgDateView.y--; }
+ if(pkgDateView.m>11){ pkgDateView.m=0; pkgDateView.y++; }
+ pkgRenderDateCalendar();
+}
+function pkgRenderDateCalendar(){
+ const popup=document.getElementById('pkg-date-popup');
+ if(!popup||!pkgDateView)return;
+ const {y,m}=pkgDateView;
+ const startDow=new Date(y,m,1).getDay();
+ const daysInMonth=new Date(y,m+1,0).getDate();
+ const todayISO=pkgDateISO(new Date());
+ const dows=["일","월","화","수","목","금","토"];
+ let cells="";
+ for(let i=0;i<startDow;i++) cells+=`<div class="pkgDateCell pkgDateMuted"></div>`;
+ for(let d=1;d<=daysInMonth;d++){
+  const iso=pkgDateISO(new Date(y,m,d));
+  const cls=["pkgDateCell"];
+  if(iso===todayISO)cls.push("pkgDateToday");
+  if(iso===pkgDateSelectedISO)cls.push("pkgDateSelected");
+  cells+=`<div class="${cls.join(' ')}" onclick="pkgSelectDate('${iso}')">${d}</div>`;
+ }
+ popup.innerHTML=`
+  <div class="pkgDateHead">
+   <button type="button" onclick="pkgDateShiftMonth(-1)">‹</button>
+   <span class="pkgDateTitle">${y}년 ${m+1}월</span>
+   <button type="button" onclick="pkgDateShiftMonth(1)">›</button>
+  </div>
+  <div class="pkgDateGrid">
+   ${dows.map(d=>`<div class="pkgDateDow">${d}</div>`).join('')}
+   ${cells}
+  </div>
+  <div class="pkgDateFoot">
+   <button type="button" onclick="pkgClearDate()">지우기</button>
+   <button type="button" onclick="pkgTodayDate()">오늘</button>
+  </div>
+ `;
+}
+function pkgSelectDate(iso){
+ pkgDateSelectedISO=iso;
+ const input=document.getElementById('pkg-date');
+ if(input)input.value=iso;
+ const popup=document.getElementById('pkg-date-popup');
+ if(popup)popup.classList.add('hidden');
+}
+function pkgClearDate(){
+ pkgDateSelectedISO="";
+ const input=document.getElementById('pkg-date');
+ if(input)input.value="";
+ const popup=document.getElementById('pkg-date-popup');
+ if(popup)popup.classList.add('hidden');
+}
+function pkgTodayDate(){
+ const now=new Date();
+ pkgDateView={y:now.getFullYear(),m:now.getMonth()};
+ pkgSelectDate(pkgDateISO(now));
+}
+document.addEventListener('click',function(e){
+ if(e.target.closest('.pkgDateWrap'))return;
+ const popup=document.getElementById('pkg-date-popup');
+ if(popup)popup.classList.add('hidden');
+},true);
+
 /* 필름이 가진 농도 목록 중 24~35% 범위에 해당하는 값을 기본값으로 고르고, 없으면 그 범위에 가장 가까운 값을 고른다. */
 function pkgDefaultDensityInRange(opts,lo,hi){
  lo=lo||24; hi=hi||35;
@@ -3531,7 +3627,7 @@ function pkgStep3Html(){
  const densityOptHtml=(preferred)=>densityOpts.map(d=>`<option ${d===preferred?'selected':''}>${esc(d)}</option>`).join('');
  return `
   <div class="row">
-   <div class="field"><label>시공 예약 일자 *</label><div class="pkgDateWrap"><input type="date" id="pkg-date"><span class="pkgDateIcon">📅</span></div></div>
+   <div class="field"><label>시공 예약 일자 *</label><div class="pkgDateWrap"><input type="text" id="pkg-date" readonly value="${esc(pkgDateSelectedISO)}" placeholder="년-월-일" onclick="pkgToggleDatePicker()"><span class="pkgDateIcon" onclick="pkgToggleDatePicker()">📅</span><div id="pkg-date-popup" class="pkgDatePopup hidden"></div></div></div>
    <div class="field"><label>예약자 성함 *</label><input id="pkg-name" placeholder="예: 홍길동"></div>
    <div class="field"><label>연락처 *</label><input id="pkg-phone" placeholder="예: 010-1234-5678" oninput="formatPhoneInput(this)"></div>
    <div class="field"><label>차종명 *</label><input id="pkg-vehicle" placeholder="예: 제네시스 GV70"></div>
