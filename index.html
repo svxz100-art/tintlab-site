@@ -142,7 +142,7 @@ main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .certLabel{font-size:11px;color:#888;margin-bottom:3px}.certValue{font-size:13px;font-weight:700;color:#171717}
 @media(max-width:720px){.certGrid2{grid-template-columns:1fr}}
 .section{margin-top:24px}.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px}.sectionTitle h2{font-size:18px;margin:0;letter-spacing:-.03em}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:0;padding:19px}.formCard{max-width:760px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:0;padding:24px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.field{margin-bottom:13px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}.field input,.field textarea,.field select{width:100%;padding:12px;border:1px solid var(--line);border-radius:0;outline:0;background:var(--bg);color:var(--ink)}.field input:focus,.field textarea:focus{border-color:var(--accent)}
-#pkg-date{color-scheme:dark;cursor:pointer}#pkg-date::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer}.full{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.actions .btn{flex:1;min-width:120px}.notice{font-size:12px;padding:10px 12px;border-radius:0;background:var(--soft);color:var(--muted);margin-bottom:14px;border:1px solid var(--line)}.error{color:var(--danger);font-size:12px;margin:8px 0;display:none}
+#pkg-date{color-scheme:dark;cursor:pointer;padding-right:38px}#pkg-date::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer}.pkgDateWrap{position:relative}.pkgDateIcon{position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:16px;opacity:.85}.full{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.actions .btn{flex:1;min-width:120px}.notice{font-size:12px;padding:10px 12px;border-radius:0;background:var(--soft);color:var(--muted);margin-bottom:14px;border:1px solid var(--line)}.error{color:var(--danger);font-size:12px;margin:8px 0;display:none}
 .list{display:grid;gap:9px}.wcard{background:var(--card);border:1px solid var(--line);border-radius:0;padding:15px;display:flex;justify-content:space-between;align-items:center;gap:14px;cursor:pointer}.wcard:hover{border-color:var(--accent)}.wmain{min-width:0}.wno{font-size:11px;color:var(--muted)}.wtitle{font-weight:700;margin:3px 0}.wsub{font-size:12px;color:var(--muted)}.pill{font-size:11px;padding:5px 9px;border-radius:999px;background:rgba(74,222,128,.14);color:var(--ok);white-space:nowrap}
 .pill.kakao-done{background:#fee500;color:#000;font-weight:700}.pill.kakao-wait{background:var(--soft);color:var(--muted)}.pill.pay-pending{background:rgba(255,122,94,.16);color:var(--accent-text);font-weight:700}.pill.pay-fail{background:rgba(255,107,94,.16);color:var(--danger);font-weight:700}
 .pill.badge-super{background:rgba(201,164,255,.14);color:var(--super);font-weight:700;border:1px solid rgba(201,164,255,.4)}
@@ -3526,21 +3526,22 @@ function pkgStep3Html(){
  const tier=pkgSelectedTier();
  const addons=pkgAddonList();
  const densityOpts=densityOptionsFor(pkgWizard.tintFilm);
- const defaultDensity=pkgDefaultDensityInRange(densityOpts);
+ const defaultDensityFront=pkgDefaultDensityInRange(densityOpts,24,35);
+ const defaultDensitySide=pkgDefaultDensityInRange(densityOpts,10,15);
  const densityOptHtml=(preferred)=>densityOpts.map(d=>`<option ${d===preferred?'selected':''}>${esc(d)}</option>`).join('');
  return `
   <div class="row">
-   <div class="field"><label>시공 예약 일자 *</label><input type="date" id="pkg-date"></div>
+   <div class="field"><label>시공 예약 일자 *</label><div class="pkgDateWrap"><input type="date" id="pkg-date"><span class="pkgDateIcon">📅</span></div></div>
    <div class="field"><label>예약자 성함 *</label><input id="pkg-name" placeholder="예: 홍길동"></div>
    <div class="field"><label>연락처 *</label><input id="pkg-phone" placeholder="예: 010-1234-5678" oninput="formatPhoneInput(this)"></div>
    <div class="field"><label>차종명 *</label><input id="pkg-vehicle" placeholder="예: 제네시스 GV70"></div>
   </div>
   ${pkgWizard.tintFilm?`<div class="muted" style="font-size:12px;margin:-6px 0 10px">선택한 썬팅 필름: <b style="color:var(--ink)">${esc(tintFilmLabel(pkgWizard.tintFilm))}</b> · 농도는 이 필름 기준으로만 선택 가능합니다.</div>`:''}
   <div class="row">
-   <div class="field"><label>전면 틴팅 농도</label><select id="pkg-tint-front">${densityOptHtml(defaultDensity)}</select></div>
-   <div class="field"><label>1열 측면 틴팅 농도</label><select id="pkg-tint-side1">${densityOptHtml(defaultDensity)}</select></div>
-   <div class="field"><label>2열 측면 틴팅 농도</label><select id="pkg-tint-side2">${densityOptHtml(defaultDensity)}</select></div>
-   <div class="field"><label>후면 틴팅 농도</label><select id="pkg-tint-rear">${densityOptHtml(defaultDensity)}</select></div>
+   <div class="field"><label>전면 틴팅 농도</label><select id="pkg-tint-front">${densityOptHtml(defaultDensityFront)}</select></div>
+   <div class="field"><label>1열 측면 틴팅 농도</label><select id="pkg-tint-side1">${densityOptHtml(defaultDensitySide)}</select></div>
+   <div class="field"><label>2열 측면 틴팅 농도</label><select id="pkg-tint-side2">${densityOptHtml(defaultDensitySide)}</select></div>
+   <div class="field"><label>후면 틴팅 농도</label><select id="pkg-tint-rear">${densityOptHtml(defaultDensitySide)}</select></div>
    <div class="field full"><label>요청사항</label><textarea id="pkg-note" rows="3" placeholder="요청사항을 입력해주세요"></textarea></div>
   </div>
 
