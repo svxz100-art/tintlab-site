@@ -1452,10 +1452,17 @@ async function loadSessionProfile(authId){
   ownerName:data.owner_name, phone:data.phone, email:data.email, address:data.address||"",
   remainingCredits:data.remaining_credits
  };
- // 회원 목록 화면의 본사 계정 행은 DEFAULT_SUPER_SHOP.remainingCredits(하드코딩된 기본값 999)를
- // 그대로 보여주는데, 새로고침마다 이 상수가 초기화되면서 실제 DB 값(충전된 건수)을 덮어써 보이는
- // 버그가 있었습니다. 로그인/세션 복원 시점마다 실제 값으로 동기화해서 고칩니다.
- if(currentSession.id===DEFAULT_SUPER_ID) DEFAULT_SUPER_SHOP.remainingCredits=currentSession.remainingCredits;
+ // 회원 목록 화면의 본사 계정 행은 DEFAULT_SUPER_SHOP(하드코딩된 기본값)을 그대로 보여주는데,
+ // 새로고침마다 이 상수가 초기화되면서 실제 DB 값(충전된 건수, 수정한 상호명/연락처 등)을 덮어써
+ // 보이는 버그가 있었습니다. 로그인/세션 복원 시점마다 실제 값으로 동기화해서 고칩니다.
+ if(currentSession.id===DEFAULT_SUPER_ID){
+  DEFAULT_SUPER_SHOP.remainingCredits=currentSession.remainingCredits;
+  DEFAULT_SUPER_SHOP.shopName=currentSession.shopName;
+  DEFAULT_SUPER_SHOP.bizNo=currentSession.bizNo;
+  DEFAULT_SUPER_SHOP.ownerName=currentSession.ownerName;
+  DEFAULT_SUPER_SHOP.phone=currentSession.phone;
+  DEFAULT_SUPER_SHOP.address=currentSession.address;
+ }
  return true;
 }
 
