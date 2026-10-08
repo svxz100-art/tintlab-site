@@ -3847,9 +3847,11 @@ function compressGalleryImage(file, maxSize=1600, quality=0.78){
     reader.readAsDataURL(file);
   });
 }
-const GALLERY_BUCKET='gallery-photos';
+// 버킷을 새로 만들지 않고, 기존 "틴트랩" 버킷 안에 gallery/ 폴더를 따로 둬서 다른 용도(작업지시서 등)와
+// 겹치지 않게 저장합니다.
+const GALLERY_BUCKET='틴트랩';
 async function uploadGalleryImage(blob, shopId){
-  const path=`${shopId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+  const path=`gallery/${shopId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
   const {error}=await sb.storage.from(GALLERY_BUCKET).upload(path, blob, {contentType:'image/jpeg', upsert:false});
   if(error) throw error;
   const {data}=sb.storage.from(GALLERY_BUCKET).getPublicUrl(path);
@@ -4025,7 +4027,7 @@ async function createGalleryPost(){
     images=await galleryImagesToUrls(files, shop.id);
   }catch(err){
     console.error(err);
-    alert('사진 업로드 중 오류가 발생했습니다: '+(err.message||'알 수 없는 오류')+'\n(Supabase Storage에 "gallery-photos" 버킷이 생성되어 있는지 확인해주세요)');
+    alert('사진 업로드 중 오류가 발생했습니다: '+(err.message||'알 수 없는 오류')+'\n(Supabase Storage "틴트랩" 버킷이 Public으로 설정되어 있는지 확인해주세요)');
     if(btn){btn.disabled=false;btn.textContent='갤러리 등록';}
     return;
   }
