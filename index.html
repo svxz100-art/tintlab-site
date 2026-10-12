@@ -860,7 +860,6 @@ function getGalleryShortTitle(){
      </div>
      <div class="issuedActions">
       <button class="btn" onclick="copyIssuedShare()">링크 복사</button>
-      <button class="btn" onclick="smsIssuedShare()">문자 발송</button>
       <button class="btn" onclick="printJustIssued()">PDF 저장</button>
      </div>
     </div>
@@ -945,13 +944,13 @@ function getGalleryShortTitle(){
    <div style="font-weight:700;font-size:13px;margin-bottom:6px">전체 보증서 DB 내보내기</div>
    <div style="display:flex;gap:6px">
     <button class="btn" style="padding:8px 12px;font-size:12px;" onclick="exportToCSV()">엑셀(CSV) 다운로드</button>
-    <button class="btn" style="padding:8px 12px;font-size:12px;" onclick="exportToJSON()">전체 백업(JSON)</button>
+    <button class="btn" style="padding:8px 12px;font-size:12px;" onclick="exportWarrantiesBackup()">보증서 백업(JSON)</button>
    </div>
   </div>
   <div class="card" style="padding:14px;">
-   <div style="font-weight:700;font-size:13px;margin-bottom:6px">백업 데이터 복원</div>
-   <input type="file" id="import-file" accept=".csv, .json" style="display:none" onchange="importDataFile(event)">
-   <button class="btn" style="padding:8px 12px;font-size:12px;width:100%" onclick="document.getElementById('import-file').click()">CSV / JSON 백업 복원</button>
+   <div style="font-weight:700;font-size:13px;margin-bottom:6px">보증서 백업 복원</div>
+   <input type="file" id="import-file" accept=".json" style="display:none" onchange="importDataFile(event)">
+   <button class="btn" style="padding:8px 12px;font-size:12px;width:100%" onclick="document.getElementById('import-file').click()">보증서 백업(JSON) 복원</button>
   </div>
  </div>
 
@@ -981,9 +980,7 @@ function getGalleryShortTitle(){
   <h2>전체 지점 보증서</h2>
   <button class="btn" onclick="show('admin')">← 관리자 센터로</button>
  </div>
- <div class="row" style="margin-bottom:12px">
-  <div class="field" style="margin:0"><label>지점</label><select id="aw-branch" onchange="renderAllWarrantiesList(true)"></select></div>
- </div>
+ <div class="field" style="margin:0 0 12px;max-width:280px"><label>지점</label><select id="aw-branch" onchange="renderAllWarrantiesList(true)"></select></div>
  <div class="wlSearchBar">
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   <input id="aw-q" oninput="renderAllWarrantiesList(true)" placeholder="고객명, 차량번호, 보증서 번호, 연락처로 검색...">
@@ -1254,10 +1251,6 @@ function pkgCalcTotal(){
  const heatlineExtra=heatlineApplicable&&heatlinePrice?heatlinePrice:0;
  return{base:tier.price,addon:addonTotal,vehicle:vClass.extra,tint:tintExtra,heatline:heatlineExtra,heatlineQuote:heatlineApplicable&&heatlinePrice===null,total:tier.price+addonTotal+vClass.extra+tintExtra+heatlineExtra,original:tier.originalPrice};
 }
-
-// 개별 보증서의 문자 재발송용 기본 문구
-const DEFAULT_SMS_TMPL="[틴트랩 남부법원점] {customer}님, 시공받으신 차량 보증서({no})가 발급되었습니다.\n\n보증서 확인:\n{url}";
-function getSmsTemplate(){ return localStorage.getItem("tintrap_sms_template") || DEFAULT_SMS_TMPL; }
 
 const DEFAULT_SUPER_ID="svxz100";
 
@@ -1591,6 +1584,19 @@ function openMemberInfoModal(){
  document.getElementById("common-modal").classList.add("open");
 }
 
+// 계정 정보수정 모달 2곳(가맹 회원/슈퍼관리자)에서 "현재 비밀번호/새 비밀번호" 칸이 채워져 있을 때만
+// 재인증 후 비밀번호를 변경하는 공용 로직입니다. 둘 다 비어있으면 그냥 통과(ok:true)시킵니다.
+async function changePasswordIfRequested(curPwElId,newPwElId){
+ const curPw=document.getElementById(curPwElId)?.value||"";
+ const newPw=(document.getElementById(newPwElId)?.value||"").trim();
+ if(!curPw && !newPw) return {ok:true};
+ if(!newPw || newPw.length<6) return {ok:false, message:"새 비밀번호는 6자 이상이어야 합니다."};
+ const {error:reauthErr}=await sb.auth.signInWithPassword({email:currentSession.email,password:curPw});
+ if(reauthErr) return {ok:false, message:"현재 비밀번호가 일치하지 않습니다."};
+ const {error:pwErr}=await sb.auth.updateUser({password:newPw});
+ if(pwErr) return {ok:false, message:"비밀번호 변경 중 오류: "+pwErr.message};
+ return {ok:true};
+}
 async function saveMemberAccountInfo(){
  const err = document.getElementById("member-info-error");
  if(!currentSession){ alert("회원 정보를 찾을 수 없습니다."); return; }
@@ -1604,24 +1610,8 @@ async function saveMemberAccountInfo(){
   return;
  }
 
- const curPw = document.getElementById("mi-cur-pw").value;
- const newPw = document.getElementById("mi-new-pw").value;
- if(curPw || newPw){
-  if(!newPw || newPw.trim().length < 6){
-   if(err){ err.textContent = "새 비밀번호는 6자 이상이어야 합니다."; err.style.display = "block"; }
-   return;
-  }
-  const {error:reauthErr}=await sb.auth.signInWithPassword({email:currentSession.email,password:curPw});
-  if(reauthErr){
-   if(err){ err.textContent = "현재 비밀번호가 일치하지 않습니다."; err.style.display = "block"; }
-   return;
-  }
-  const {error:pwErr}=await sb.auth.updateUser({password:newPw.trim()});
-  if(pwErr){
-   if(err){ err.textContent = "비밀번호 변경 중 오류: "+pwErr.message; err.style.display = "block"; }
-   return;
-  }
- }
+ const pwResult=await changePasswordIfRequested("mi-cur-pw","mi-new-pw");
+ if(!pwResult.ok){ if(err){ err.textContent=pwResult.message; err.style.display="block"; } return; }
 
  const {error}=await sb.from("members").update({owner_name:ownerName,phone,address}).eq("id",currentSession.authId);
  if(error){
@@ -1651,24 +1641,8 @@ async function saveSuperAccountInfo(){
   if(err){err.textContent="모든 정보를 입력해주세요.";err.style.display="block";}
   return;
  }
- const curPw=document.getElementById("si-cur-pw").value;
- const newPw=document.getElementById("si-new-pw").value;
- if(curPw||newPw){
-  if(!newPw||newPw.length<6){
-   if(err){err.textContent="새 비밀번호는 6자 이상이어야 합니다.";err.style.display="block";}
-   return;
-  }
-  const {error:reauthErr}=await sb.auth.signInWithPassword({email:currentSession.email,password:curPw});
-  if(reauthErr){
-   if(err){err.textContent="현재 비밀번호가 일치하지 않습니다.";err.style.display="block";}
-   return;
-  }
-  const {error:pwErr}=await sb.auth.updateUser({password:newPw});
-  if(pwErr){
-   if(err){err.textContent="비밀번호 변경 중 오류가 발생했습니다: "+pwErr.message;err.style.display="block";}
-   return;
-  }
- }
+ const pwResult=await changePasswordIfRequested("si-cur-pw","si-new-pw");
+ if(!pwResult.ok){ if(err){ err.textContent=pwResult.message; err.style.display="block"; } return; }
  const {error}=await sb.from("members").update({
   shop_name:shopName, biz_no:bizNo, owner_name:ownerName, phone, address
  }).eq("id",currentSession.authId);
@@ -2474,9 +2448,6 @@ async function issue(){
   }
  }
 
- // 잔여 한도 1 차감 및 로그 기록 반영
- await updateShopCredits(curShop.id, curShop.remainingCredits - 1);
-
  const issuedDate=superIssuedOverride||fmt(new Date());
  const exp=new Date(issuedDate.replaceAll(".","-"));exp.setMonth(exp.getMonth()+months);
  let w={
@@ -2500,9 +2471,16 @@ async function issue(){
  };
  if(superNoOverride)w.no=superNoOverride; // 지정하지 않으면 DB가 자동으로 고유 번호를 발급합니다.
 
+ // 보증서를 먼저 DB에 저장한 뒤에만 한도를 차감합니다 — 순서가 반대였을 때는 저장이 실패해도
+ // 이미 차감된 한도가 복구되지 않는 문제가 있었습니다.
  const {data:savedRow,error:insertErr}=await dbInsertWarranty(w);
  if(insertErr){ err.textContent="발행 중 오류가 발생했습니다: "+insertErr.message; err.style.display="block"; return; }
  w=savedRow;
+
+ // 잔여 한도 1 차감. 보증서 저장엔 이미 성공했으므로, 한도 차감이 실패하더라도 보증서 발행 자체는
+ // 되돌리지 않고(이미 발급된 문서이므로) 담당자에게 알려 수동으로 확인하도록 합니다.
+ const creditOk=await updateShopCredits(curShop.id, curShop.remainingCredits - 1);
+ if(!creditOk) console.error("잔여 한도 차감 실패 — 보증서는 정상 발행되었으나 한도가 반영되지 않았습니다.", curShop.id);
 
  // 보증서 번호가 DB에서 막 발급된 뒤(w.no 확정 후)에 알림톡을 보내야 공유링크/번호가 정확합니다.
  await sendKakaoAlimtalk(w);
@@ -2510,6 +2488,7 @@ async function issue(){
  if(kakaoSaveErr) console.error("카카오 발송 상태 저장 실패", kakaoSaveErr);
 
  warranties.unshift(w);selected=w;clearForm();renderIssued(w);show("issued");
+ if(!creditOk) alert("보증서는 정상 발행되었지만, 잔여 한도 차감에 실패했습니다. 관리자 > 회원점 관리에서 잔여 한도를 확인해주세요.");
 }
 
 function clearForm(){
@@ -2907,24 +2886,26 @@ function renderWarrantyList(resetPage){
  const start=(__wlPage-1)*WL_PER_PAGE;
  const pageItems=arr.slice(start,start+WL_PER_PAGE);
  listEl.innerHTML=pageItems.map(card).join("")||'<div class="card muted">일치하는 보증서가 없습니다.</div>';
- if(pagEl) pagEl.innerHTML=wlPaginationHtml(__wlPage,totalPages,arr.length);
+ if(pagEl) pagEl.innerHTML=sharedPaginationHtml(__wlPage,totalPages,arr.length,'wlGoPage');
 }
-function wlPaginationHtml(cur,total,count){
+// 보증서 목록(wl-)과 전체 지점 보증서(aw-)가 쪽수 버튼 UI를 똑같이 써서 공용 헬퍼로 합쳤습니다.
+// goFn은 페이지 이동 시 호출할 전역 함수 이름(문자열)입니다.
+function sharedPaginationHtml(cur,total,count,goFn){
  if(total<=1) return count?`<div class="wlPageInfo">전체 ${count}건</div>`:"";
  let pages="";
  for(let i=1;i<=total;i++){
   const edge = i===1||i===total;
   const near = Math.abs(i-cur)<=2;
   if(edge||near){
-   pages+=`<button type="button" class="wlPageBtn${i===cur?" active":""}" onclick="wlGoPage(${i})">${i}</button>`;
+   pages+=`<button type="button" class="wlPageBtn${i===cur?" active":""}" onclick="${goFn}(${i})">${i}</button>`;
   } else if(Math.abs(i-cur)===3){
    pages+=`<span class="wlPageEllipsis">…</span>`;
   }
  }
  return `<div class="wlPageInfo">전체 ${count}건</div><div class="wlPageBtns">
-  <button type="button" class="wlPageBtn" ${cur<=1?"disabled":""} onclick="wlGoPage(${cur-1})">‹ 이전</button>
+  <button type="button" class="wlPageBtn" ${cur<=1?"disabled":""} onclick="${goFn}(${cur-1})">‹ 이전</button>
   ${pages}
-  <button type="button" class="wlPageBtn" ${cur>=total?"disabled":""} onclick="wlGoPage(${cur+1})">다음 ›</button>
+  <button type="button" class="wlPageBtn" ${cur>=total?"disabled":""} onclick="${goFn}(${cur+1})">다음 ›</button>
  </div>`;
 }
 function wlGoPage(n){
@@ -2958,25 +2939,7 @@ function renderAllWarrantiesList(resetPage){
  const start=(__awPage-1)*WL_PER_PAGE;
  const pageItems=arr.slice(start,start+WL_PER_PAGE);
  listEl.innerHTML=pageItems.map(card).join("")||'<div class="card muted">일치하는 보증서가 없습니다.</div>';
- if(pagEl) pagEl.innerHTML=awPaginationHtml(__awPage,totalPages,arr.length);
-}
-function awPaginationHtml(cur,total,count){
- if(total<=1) return count?`<div class="wlPageInfo">전체 ${count}건</div>`:"";
- let pages="";
- for(let i=1;i<=total;i++){
-  const edge = i===1||i===total;
-  const near = Math.abs(i-cur)<=2;
-  if(edge||near){
-   pages+=`<button type="button" class="wlPageBtn${i===cur?" active":""}" onclick="awGoPage(${i})">${i}</button>`;
-  } else if(Math.abs(i-cur)===3){
-   pages+=`<span class="wlPageEllipsis">…</span>`;
-  }
- }
- return `<div class="wlPageInfo">전체 ${count}건</div><div class="wlPageBtns">
-  <button type="button" class="wlPageBtn" ${cur<=1?"disabled":""} onclick="awGoPage(${cur-1})">‹ 이전</button>
-  ${pages}
-  <button type="button" class="wlPageBtn" ${cur>=total?"disabled":""} onclick="awGoPage(${cur+1})">다음 ›</button>
- </div>`;
+ if(pagEl) pagEl.innerHTML=sharedPaginationHtml(__awPage,totalPages,arr.length,'awGoPage');
 }
 function awGoPage(n){
  __awPage=n;
@@ -3230,75 +3193,6 @@ function printJustIssued(){
 }
 function copyIssuedShare(){copyShare();}
 
-function smsIssuedShare(){
- if(!selected)return;
- const u=buildShareUrl(selected);
- const shop = selected.shopInfo || DEFAULT_SUPER_SHOP;
- let tmpl=getSmsTemplate();
- const msg=tmpl.replace("{shopName}",shop.shopName).replace("{customer}",selected.customer).replace("{no}",selected.no).replace("{url}",u);
- const digits=norm(selected.phone||"");
- const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
- const sep=isIOS?"&":"?";
- window.location.href=`sms:${digits}${sep}body=${encodeURIComponent(msg)}`;
-}
-
-
-function openPackageModal(){
-  const imgData = localStorage.getItem(PACKAGE_IMG_KEY);
-  const modalContent = document.getElementById("modal-body-content");
-  if(!imgData){
-    modalContent.innerHTML = `
-      <h3>📋 신차패키지 견적 안내</h3>
-      <div class="notice" style="margin-top:12px;">현재 등록된 최신 견적표 이미지가 없습니다.<br>관리자 권한으로 로그인 후 [신차패키지 견적 이미지 관리] 메뉴에서 이미지를 업로드해 주세요.</div>
-    `;
-  } else {
-    modalContent.innerHTML = `
-      <h3>📋 틴트랩 남부법원점 신차패키지 견적</h3>
-      <div style="margin-top:12px;text-align:center;">
-        <img src="${imgData}" style="max-width:100%;border-radius:0;border:1px solid var(--line);" alt="신차패키지 견적표">
-      </div>
-      <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">
-        <a href="${imgData}" download="tintrap_package_price.jpg" class="btn dark" style="text-decoration:none;">견적표 이미지 다운로드</a>
-        <button class="btn" onclick="closeCommonModal()">닫기</button>
-      </div>
-    `;
-  }
-  document.getElementById("common-modal").classList.add("open");
-}
-
-function openGalleryModal(){
-  const modalContent = document.getElementById("modal-body-content");
-  modalContent.innerHTML = `
-    <h3>✨ 시공 갤러리 & 성능 비교</h3>
-    <div style="margin-top:12px;font-size:13px;line-height:1.6;color:#444;">
-      <p><b>• 프리미엄 시공 전후:</b> Tesla Model Y Juniper, 제네시스 GV70 등 고품격 버텍스 썬팅 및 PPF 시공 포트폴리오를 제공합니다.</p>
-      <p><b>• 필름 성능 비교:</b> 총 태양에너지 차단율(TSER) 최대 70% 이상의 고성능 정품 필름만을 엄선하여 시공합니다.</p>
-      <p><b>• 고객 생생 후기:</b> 시공 만족도 99% 이상을 자랑하는 틴트랩 남부법원점의 프리미엄 디테일링 서비스를 경험해 보세요.</p>
-    </div>
-    <div style="margin-top:16px;text-align:center;">
-      <button class="btn dark" onclick="closeCommonModal()">확인</button>
-    </div>
-  `;
-  document.getElementById("common-modal").classList.add("open");
-}
-
-function openBranchModal(){
-  const modalContent = document.getElementById("modal-body-content");
-  modalContent.innerHTML = `
-    <h3>📍 전국 가맹점 안내</h3>
-    <div style="margin-top:12px;font-size:13px;line-height:1.6;color:#444;">
-      <p><b>지점명:</b> 틴트랩 남부법원점 (본점)</p>
-      <p><b>주소:</b> 서울특별시 양천구 신월로36길 9 1층 틴트랩</p>
-      <p><b>연락처:</b> 010-5362-9489</p>
-      <p><b>영업시간:</b> 평일 09:30 ~ 19:00 / 토요일 09:30 ~ 17:00</p>
-    </div>
-    <div style="margin-top:16px;text-align:center;">
-      <button class="btn dark" onclick="closeCommonModal()">확인</button>
-    </div>
-  `;
-  document.getElementById("common-modal").classList.add("open");
-}
-
 function closeCommonModal(e){
   if(!e || e.target.id === "common-modal" || e.target.classList.contains("modal-close") || e.target.classList.contains("btn")){
     document.getElementById("common-modal").classList.remove("open");
@@ -3323,31 +3217,25 @@ function exportToCSV(){
  link.click();
 }
 
-function exportToJSON(){
- if(!isSuperAdmin()){alert("전체 백업은 슈퍼 관리자만 가능합니다.");return}
+function exportWarrantiesBackup(){
+ if(!isSuperAdmin()){alert("보증서 백업은 슈퍼 관리자만 가능합니다.");return}
  try{
   const backupData = {
-    backupType: "TINTLAB_FULL_BACKUP",
-    version: "V3.1",
+    backupType: "TINTLAB_WARRANTIES_BACKUP",
+    version: "V4",
     exportedAt: new Date().toISOString(),
-    warranties: warranties,
-    members: getMembers(),
-    precautions: getPrecautions(),
-    superShopInfo: DEFAULT_SUPER_SHOP,
-    categories: getCategories(),
-    gallery: (typeof getGallery === "function" ? getGallery() : []),
-    packageImage: localStorage.getItem(PACKAGE_IMG_KEY) || ""
+    warranties: warranties
   };
   const blob = new Blob([JSON.stringify(backupData,null,2)], {type:"application/json;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const link=document.createElement("a");
   link.href=url;
-  link.download=`tintlab_full_backup_${fmt(new Date())}.json`;
+  link.download=`tintlab_warranties_backup_${fmt(new Date())}.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
-  alert(`전체 백업이 완료되었습니다.\n보증서 ${warranties.length}건 / 가맹점 ${getMembers().length}개 계정`);
+  alert(`보증서 백업이 완료되었습니다.\n보증서 ${warranties.length}건`);
  }catch(e){
   console.error(e);
   alert("백업 파일 생성 중 오류가 발생했습니다: "+e.message);
@@ -3362,7 +3250,7 @@ function importDataFile(e){
  reader.onload=async function(evt){
   try{
    const content=evt.target.result;
-   if(!file.name.endsWith(".json"))return;
+   if(!file.name.endsWith(".json")){ alert("JSON 백업 파일(.json)만 복원할 수 있습니다."); return; }
    const parsed=JSON.parse(content);
    const importedWarranties = Array.isArray(parsed.warranties) ? parsed.warranties : (Array.isArray(parsed) ? parsed : null);
    if(!importedWarranties){ alert("올바른 백업 파일이 아닙니다."); return; }
@@ -3793,6 +3681,8 @@ async function pkgSubmitAndPay(){
  const note=document.getElementById('pkg-note').value.trim();
  const agree=document.getElementById('pkg-agree').checked;
  if(!date||!name||!phone||!vehicle){ err.textContent="필수 항목을 모두 입력해주세요."; err.style.display="block"; return; }
+ const phoneDigits=norm(phone).replace(/[^0-9]/g,"");
+ if(phoneDigits.length<10||phoneDigits.length>11){ err.textContent="연락처를 010-1234-5678 형식으로 정확히 입력해주세요."; err.style.display="block"; return; }
  if(!agree){ err.textContent="이용약관 및 개인정보 처리방침에 동의해주세요."; err.style.display="block"; return; }
  if(pkgCalcTotal().heatlineQuote){ err.textContent="선택하신 필름은 모델3 열선 통시공 추가금이 아직 등록되지 않았습니다. 매장에 문의 후 진행해주세요."; err.style.display="block"; return; }
  err.style.display="none";
@@ -3896,9 +3786,12 @@ const GALLERY_KEY='tintrap_gallery_v1';
 function getGallery(){return JSON.parse(localStorage.getItem(GALLERY_KEY)||'[]')}
 function saveGallery(arr){localStorage.setItem(GALLERY_KEY,JSON.stringify(arr))}
 function galleryMonth(d=new Date()){return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')}
+// 소프트 삭제(deleted 플래그)된 게시물도 포함해서 세야 합니다 — 삭제해도 이번 달 등록 한도가
+// 다시 채워지면 안 된다는 의도된 동작이라, 월별 건수는 getGallery()의 원본 배열 기준으로 셉니다.
 function galleryMonthlyCount(issuerId){const m=galleryMonth();return getGallery().filter(g=>g.issuerId===issuerId&&g.createdAt&&g.createdAt.startsWith(m)).length}
 let gallerySelectedFiles=[];
 let galleryDragIndex=null;
+let GALLERY_EDIT_ID=null;
 // 압축된 결과를 Blob으로 돌려줍니다(기존엔 base64 dataURL을 그대로 localStorage에 저장했는데,
 // 사진 10장만 압축해도 약 6MB로 localStorage 용량 한도(보통 5MB 전후)를 넘겨 "용량 초과"로
 // 등록이 실패하는 구조적 문제가 있었습니다. 이제는 Blob을 Supabase Storage에 업로드하고
@@ -3984,11 +3877,11 @@ function removeGalleryFile(index){
   gallerySelectedFiles.splice(index,1); renderGalleryUploadPreview();
 }
 function resetGalleryUploadState(){
-  gallerySelectedFiles=[]; galleryDragIndex=null;
+  gallerySelectedFiles=[]; galleryDragIndex=null; GALLERY_EDIT_ID=null;
 }
 function renderGallery(){
   const list=document.getElementById('gallery-list'); if(!list)return;
-  const rows=getGallery().sort((a,b)=>{
+  const rows=getGallery().filter(g=>!g.deleted).sort((a,b)=>{
     const av=Number(a.views||0), bv=Number(b.views||0);
     return bv-av || String(b.createdAt||'').localeCompare(String(a.createdAt||''));
   });
@@ -4009,7 +3902,7 @@ function galleryCardHtml(g){
 function openGalleryDetail(id){
   if(id==null)return;
   const arr=getGallery();
-  const idx=arr.findIndex(g=>String(g.id)===String(id));
+  const idx=arr.findIndex(g=>String(g.id)===String(id)&&!g.deleted);
   if(idx<0){alert('시공 사례를 찾을 수 없습니다.');return;}
   arr[idx].views=Number(arr[idx].views||0)+1;
   saveGallery(arr);
@@ -4044,48 +3937,112 @@ function renderGalleryAdminBox(){
   const box=document.getElementById('gallery-admin-box'); if(!box)return;
   if(!isAdminAuthed()){box.innerHTML='';return;}
   const shop=getCurrentShopInfo(), used=galleryMonthlyCount(shop.id), left=Math.max(0,2-used);
+  const editing=GALLERY_EDIT_ID?getGallery().find(g=>g.id===GALLERY_EDIT_ID):null;
   box.innerHTML=`
     <div class="galleryAdmin">
-      <h3>시공 갤러리 등록</h3>
+      <h3>${editing?'시공 갤러리 수정':'시공 갤러리 등록'}</h3>
       <div style="font-size:12px;color:var(--super);margin-bottom:12px">${esc(shop.shopName)} · 이번 달 ${used}/2건 등록 · ${left}건 추가 가능</div>
+      ${editing?`<div class="notice" style="margin-bottom:12px">수정은 사진을 제외한 내용만 바꿀 수 있습니다. 사진을 바꾸려면 삭제 후 새로 등록해주세요(월 등록 한도가 다시 차감됩니다).</div>`:''}
       <div class="grid2">
         <div class="field">
           <label>차종 *</label>
-          <input id="gallery-vehicle-model" placeholder="예: BMW 5시리즈" autocomplete="off" oninput="makeGalleryTitle()">
+          <input id="gallery-vehicle-model" placeholder="예: BMW 5시리즈" autocomplete="off" oninput="makeGalleryTitle()" value="${esc(editing?editing.vehicleModel||'':'')}">
         </div>
         <div class="field">
           <label>필름 이름 *</label>
-          <input id="gallery-film-name" placeholder="예: 루마 버텍스 900" autocomplete="off" oninput="makeGalleryTitle()">
+          <input id="gallery-film-name" placeholder="예: 루마 버텍스 900" autocomplete="off" oninput="makeGalleryTitle()" value="${esc(editing?editing.filmName||'':'')}">
         </div>
         <div class="field full">
           <label>게시글 제목</label>
-          <input id="gallery-title" placeholder="차종 · 필름 이름" readonly>
+          <input id="gallery-title" placeholder="차종 · 필름 이름" readonly value="${esc(editing?editing.title||'':'')}">
           <div class="gallery-title-help">홈 화면에는 차종과 필름 이름만 간결하게 표시됩니다.</div>
           <div class="gallery-title-preview">표시 예시: <b id="gallery-title-preview">차종 · 필름 이름</b></div>
         </div>
         <div class="field">
           <label>제품 요약 *</label>
-          <input id="g-product" placeholder="예: 루마 버텍스 900 + PPF + 유리막" autocomplete="off">
+          <input id="g-product" placeholder="예: 루마 버텍스 900 + PPF + 유리막" autocomplete="off" value="${esc(editing?editing.productSummary||'':'')}">
         </div>
         <div class="field full">
           <label>상세 내용</label>
-          <textarea id="g-desc" placeholder="시공 내용, 전/후 차이, 성능 비교 등을 입력하세요."></textarea>
+          <textarea id="g-desc" placeholder="시공 내용, 전/후 차이, 성능 비교 등을 입력하세요.">${esc(editing?editing.description||'':'')}</textarea>
         </div>
+        ${editing?'':`
         <div class="field full">
           <label>대표 사진 포함 이미지 (최대 10장) * <span class="galleryUploadCount" id="gallery-upload-count">0 / 10</span></label>
           <input id="g-files" type="file" accept="image/*" multiple onchange="handleGalleryFileSelect(event)">
           <div class="galleryUploadHelp">사진을 선택하면 바로 미리보기가 표시됩니다. 첫 번째 사진이 대표사진입니다. 사진을 삭제하거나 ← → 버튼, 드래그로 순서를 변경할 수 있습니다.</div>
           <div id="gallery-upload-preview" class="galleryUploadPreview"></div>
-        </div>
+        </div>`}
       </div>
       <div class="fileHint">한 게시글당 사진 최대 10장, 가맹점별 월 최대 2개까지 등록됩니다.</div>
       <div class="actions">
+        ${editing?`
+        <button type="button" class="btn" onclick="resetGalleryUploadState(); renderGalleryAdminBox();">수정 취소</button>
+        <button type="button" class="btn super" onclick="saveGalleryEdit()">수정 저장</button>
+        `:`
         <button type="button" class="btn" onclick="resetGalleryUploadState(); renderGalleryAdminBox();">입력 초기화</button>
         <button type="button" class="btn" onclick="show('home')">취소</button>
         <button type="button" class="btn super" onclick="createGalleryPost()">갤러리 등록</button>
+        `}
       </div>
+      ${galleryMyPostsHtml(shop.id)}
     </div>`;
-  renderGalleryUploadPreview();
+  if(!editing) renderGalleryUploadPreview();
+}
+// 이 지점이 등록한(삭제되지 않은) 게시물 목록 — 수정/삭제 버튼 포함.
+function galleryMyPostsHtml(shopId){
+  const mine=getGallery().filter(g=>g.issuerId===shopId&&!g.deleted).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  if(!mine.length) return '';
+  return `
+    <h4 class="pe-section-h" style="margin-top:20px">내가 등록한 시공 갤러리</h4>
+    <div style="display:grid;gap:8px">
+      ${mine.map(g=>`
+        <div class="peRow" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="min-width:0">
+            <div style="font-weight:700;font-size:13px">${esc(g.title||[g.vehicleModel,g.filmName].filter(Boolean).join(' · '))}</div>
+            <div class="muted" style="font-size:11px">${esc(g.createdAt||'-')} · 조회 ${Number(g.views||0).toLocaleString()}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button type="button" class="btn" style="padding:4px 10px;font-size:11px" onclick="galleryStartEdit('${esc(g.id)}')">수정</button>
+            <button type="button" class="btn danger" style="padding:4px 10px;font-size:11px" onclick="deleteGalleryPost('${esc(g.id)}')">삭제</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+function galleryStartEdit(id){
+  GALLERY_EDIT_ID=id;
+  renderGalleryAdminBox();
+  document.getElementById('gallery-admin-box')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function saveGalleryEdit(){
+  if(!GALLERY_EDIT_ID)return;
+  const arr=getGallery();
+  const idx=arr.findIndex(g=>g.id===GALLERY_EDIT_ID);
+  if(idx<0){ alert('게시물을 찾을 수 없습니다.'); GALLERY_EDIT_ID=null; renderGalleryAdminBox(); return; }
+  const model=(document.getElementById('gallery-vehicle-model')?.value||'').trim();
+  const film=(document.getElementById('gallery-film-name')?.value||'').trim();
+  const product=(document.getElementById('g-product')?.value||'').trim();
+  const desc=(document.getElementById('g-desc')?.value||'').trim();
+  if(!model||!film||!product){ alert('차종, 필름 이름, 제품 요약은 필수입니다.'); return; }
+  arr[idx]={...arr[idx],vehicleModel:model,filmName:film,title:[model,film].filter(Boolean).join(' · '),productSummary:product,description:desc};
+  saveGallery(arr);
+  resetGalleryUploadState();
+  renderGallery();
+  alert('시공 갤러리가 수정되었습니다.');
+}
+// 삭제는 소프트 삭제입니다 — 목록/상세 화면에서는 사라지지만, 월별 등록 건수(galleryMonthlyCount)는
+// 그대로 유지되어 이번 달 등록 한도가 다시 채워지지 않습니다 (의도된 동작).
+function deleteGalleryPost(id){
+  if(!confirm('이 시공 갤러리를 삭제하시겠습니까?\n삭제해도 이번 달 등록 한도는 복구되지 않습니다.'))return;
+  const arr=getGallery();
+  const idx=arr.findIndex(g=>g.id===id);
+  if(idx<0)return;
+  arr[idx].deleted=true;
+  arr[idx].deletedAt=fmt(new Date());
+  saveGallery(arr);
+  if(GALLERY_EDIT_ID===id){ GALLERY_EDIT_ID=null; resetGalleryUploadState(); }
+  renderGallery();
 }
 async function createGalleryPost(){
   if(!isAdminAuthed()){alert('관리자 로그인이 필요합니다.');return;}
@@ -4126,6 +4083,7 @@ async function createGalleryPost(){
       description:desc,
       images,
       views:0,
+      deleted:false,
       createdAt:fmt(new Date())
     });
     saveGallery(arr);
