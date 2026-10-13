@@ -1382,6 +1382,20 @@ async function updateShopCredits(shopId, newCredits){
   return true;
 }
 
+// 보증서 발행 시 잔여 한도를 1 차감합니다. 화면에 캐시된 잔여값(currentSession.remainingCredits)을
+// 그대로 믿고 "-1"을 계산하면, 같은 계정으로 여러 기기/탭에서 거의 동시에 발행할 때 두 요청이 똑같이
+// 오래된 값을 기준으로 계산해버려서 실제로는 2건이 발행됐는데 한도는 1건만 깎이는 문제가 생깁니다.
+// 차감 직전에 DB에서 최신 값을 다시 읽어와 그 값을 기준으로 계산해서 이 문제를 크게 줄입니다.
+async function deductOneCreditForIssuance(shopId){
+ if(!sb)return false;
+ const m=membersCache.find(x=>x.id===shopId);
+ const authId=(currentSession && currentSession.id===shopId)?currentSession.authId:(m&&m.authId);
+ if(!authId)return false;
+ const {data:freshRow,error:readErr}=await sb.from("members").select("remaining_credits").eq("id",authId).single();
+ if(readErr||!freshRow){ console.error("deductOneCreditForIssuance: 최신 잔여값 조회 실패",readErr); return false; }
+ const newValue=Math.max(0, Number(freshRow.remaining_credits||0)-1);
+ return await updateShopCredits(shopId, newValue);
+}
 
 let pendingAdminTarget="admin";
 
@@ -2479,7 +2493,7 @@ async function issue(){
 
  // 잔여 한도 1 차감. 보증서 저장엔 이미 성공했으므로, 한도 차감이 실패하더라도 보증서 발행 자체는
  // 되돌리지 않고(이미 발급된 문서이므로) 담당자에게 알려 수동으로 확인하도록 합니다.
- const creditOk=await updateShopCredits(curShop.id, curShop.remainingCredits - 1);
+ const creditOk=await deductOneCreditForIssuance(curShop.id);
  if(!creditOk) console.error("잔여 한도 차감 실패 — 보증서는 정상 발행되었으나 한도가 반영되지 않았습니다.", curShop.id);
 
  // 보증서 번호가 DB에서 막 발급된 뒤(w.no 확정 후)에 알림톡을 보내야 공유링크/번호가 정확합니다.
