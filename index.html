@@ -1261,7 +1261,7 @@ const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const sb=(window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY)
   : null;
-let currentSession=null; // {id(=shop_id), authId(=supabase uid), role, shopName, bizNo, ownerName, phone, email, address, remainingCredits}
+let currentSession=null; // {id(=shop_id), authId(=supabase uid), role, shopName, bizNo, ownerName, phone, email, address, totalCredits}
 let membersCache=[];
 
 /* 기본 매장 정보 세팅 */
@@ -1273,7 +1273,7 @@ const DEFAULT_SUPER_SHOP={
   phone: "010-5362-9489",
   email: "tintlab@naver.com",
   address: "서울특별시 양천구 신월로36길 9 1층 틴트랩",
-  remainingCredits: 999
+  totalCredits: 999
 };
 
 const DEFAULT_CATS=["썬팅","PPF","유리막 코팅","발수코팅","가죽 코팅"];
@@ -1318,7 +1318,7 @@ function getMembers(){
 function memberRowToObj(r){
   return {
     id:r.shop_id, authId:r.id, shopName:r.shop_name, bizNo:r.biz_no, ownerName:r.owner_name,
-    phone:r.phone, email:r.email, address:r.address||"", remainingCredits:r.remaining_credits,
+    phone:r.phone, email:r.email, address:r.address||"", totalCredits:r.total_credits,
     branchNo:r.branch_no
   };
 }
@@ -1335,10 +1335,10 @@ function activatePreviewDemoMode(){
     id:DEFAULT_SUPER_ID, authId:"preview-demo-auth", role:"super",
     shopName:DEFAULT_SUPER_SHOP.shopName, bizNo:DEFAULT_SUPER_SHOP.bizNo, ownerName:DEFAULT_SUPER_SHOP.ownerName,
     phone:DEFAULT_SUPER_SHOP.phone, email:DEFAULT_SUPER_SHOP.email, address:DEFAULT_SUPER_SHOP.address,
-    remainingCredits:999
+    totalCredits:999
   };
   membersCache=[
-    {id:"tint_mokdong", authId:"preview-demo-member", shopName:"틴트랩 목동점", bizNo:"222-33-44444", ownerName:"김목동", phone:"010-2222-3333", email:"mokdong@tintlab.co.kr", address:"서울특별시 양천구 목동동로 345", remainingCredits:15}
+    {id:"tint_mokdong", authId:"preview-demo-member", shopName:"틴트랩 목동점", bizNo:"222-33-44444", ownerName:"김목동", phone:"010-2222-3333", email:"mokdong@tintlab.co.kr", address:"서울특별시 양천구 목동동로 345", totalCredits:15}
   ];
   if(!warranties.length){
     warranties=[{id:1,no:"WR-2026-000001",issuerId:DEFAULT_SUPER_ID,owner_auth_id:currentSession.authId,items:[{category:"썬팅",detail:"루마 버텍스 900 전면 30% / 측후면 15%"}],amount:350000,vehicle:"12가 3456",vehicleModel:"제네시스 GV70",vin:"KMHXX00XXXX000001",customer:"홍길동",phone:"010-1234-5678",issued:fmt(now),expire:fmt(exp),months:12,status:"보증 중",kakaoStatus:"발송 완료",kakaoSentAt:fmt(now),shopInfo:currentSession}];
@@ -1364,37 +1364,29 @@ function getCurrentShopInfo(){
   return DEFAULT_SUPER_SHOP;
 }
 
+// 잔여 건수는 더 이상 별도로 저장/차감하지 않습니다. "총충전"만 충전 버튼을 누를 때 저장되는 값이고,
+// 잔여는 항상 "총충전 − 실제 발행된 보증서 개수"로 그 자리에서 계산합니다(아래 remainingFor).
+// 이렇게 하면 보증서 발행 과정에서 크레딧 테이블을 아예 건드리지 않으므로, 발행 중 어떤 이유로든
+// 차감이 누락되는 유형의 버그 자체가 원천적으로 생길 수 없습니다.
+function warrantyCountFor(shopId){return warranties.filter(w=>w.issuerId===shopId).length}
+function remainingFor(shopId,totalCredits){return Math.max(0, Number(totalCredits||0)-warrantyCountFor(shopId))}
+
 // 반환값: 실제로 DB에 저장됐는지 여부. 호출부(confirmAddStoreCredits)는 이 값을 반드시 확인해서,
 // 저장이 실패했는데도 "충전됐습니다" 라고 알리는 일이 없도록 해야 합니다.
 // (DB의 RLS 정책상 슈퍼관리자가 다른 가맹점 행을 업데이트하면 에러 없이 0건만 반영되고 조용히
 // 무시되는 경우가 있어, .update()에 .select()를 붙여 실제 반영된 행이 있는지까지 확인합니다.)
-async function updateShopCredits(shopId, newCredits){
-  const value=Math.max(0, Number(newCredits)||0);
+async function setTotalCredits(shopId, newTotal){
+  const value=Math.max(0, Number(newTotal)||0);
   const m=membersCache.find(x=>x.id===shopId);
   const authId=(currentSession && currentSession.id===shopId)?currentSession.authId:(m&&m.authId);
   if(!authId||!sb)return false;
-  const {data,error}=await sb.from("members").update({remaining_credits:value}).eq("id",authId).select();
-  if(error){ console.error("updateShopCredits",error); return false; }
-  if(!data||!data.length){ console.error("updateShopCredits: 0 rows updated — DB 권한(RLS) 정책에 의해 차단됐을 수 있습니다."); return false; }
-  if(currentSession && currentSession.id===shopId) currentSession.remainingCredits=value;
-  if(m) m.remainingCredits=value;
-  if(shopId===DEFAULT_SUPER_ID) DEFAULT_SUPER_SHOP.remainingCredits=value;
+  const {data,error}=await sb.from("members").update({total_credits:value}).eq("id",authId).select();
+  if(error){ console.error("setTotalCredits",error); return false; }
+  if(!data||!data.length){ console.error("setTotalCredits: 0 rows updated — DB 권한(RLS) 정책에 의해 차단됐을 수 있습니다."); return false; }
+  if(currentSession && currentSession.id===shopId) currentSession.totalCredits=value;
+  if(m) m.totalCredits=value;
+  if(shopId===DEFAULT_SUPER_ID) DEFAULT_SUPER_SHOP.totalCredits=value;
   return true;
-}
-
-// 보증서 발행 시 잔여 한도를 1 차감합니다. 화면에 캐시된 잔여값(currentSession.remainingCredits)을
-// 그대로 믿고 "-1"을 계산하면, 같은 계정으로 여러 기기/탭에서 거의 동시에 발행할 때 두 요청이 똑같이
-// 오래된 값을 기준으로 계산해버려서 실제로는 2건이 발행됐는데 한도는 1건만 깎이는 문제가 생깁니다.
-// 차감 직전에 DB에서 최신 값을 다시 읽어와 그 값을 기준으로 계산해서 이 문제를 크게 줄입니다.
-async function deductOneCreditForIssuance(shopId){
- if(!sb)return false;
- const m=membersCache.find(x=>x.id===shopId);
- const authId=(currentSession && currentSession.id===shopId)?currentSession.authId:(m&&m.authId);
- if(!authId)return false;
- const {data:freshRow,error:readErr}=await sb.from("members").select("remaining_credits").eq("id",authId).single();
- if(readErr||!freshRow){ console.error("deductOneCreditForIssuance: 최신 잔여값 조회 실패",readErr); return false; }
- const newValue=Math.max(0, Number(freshRow.remaining_credits||0)-1);
- return await updateShopCredits(shopId, newValue);
 }
 
 let pendingAdminTarget="admin";
@@ -1419,7 +1411,7 @@ function updateNavVisibility(){
  const issueShopEl = document.getElementById("issue-shop-name");
  const limitNoticeEl = document.getElementById("issue-limit-notice");
  if(issueShopEl) issueShopEl.textContent = curShop.shopName;
- if(limitNoticeEl) limitNoticeEl.textContent = `[${curShop.shopName}] 선결제 잔여 한도: ${curShop.remainingCredits}건 남음`;
+ if(limitNoticeEl) limitNoticeEl.textContent = `[${curShop.shopName}] 선결제 잔여 한도: ${remainingFor(curShop.id,curShop.totalCredits)}건 남음`;
 }
 
 function goAdmin(){
@@ -1434,7 +1426,7 @@ function goAdmin(){
 function goIssue(){
  if(isAdminAuthed()){
    const shop = getCurrentShopInfo();
-   if(shop.remainingCredits <= 0){
+   if(remainingFor(shop.id,shop.totalCredits) <= 0){
      alert("발행 가능 한도가 모두 소진되었습니다. 건수 충전 후 이용해주세요.");
      return;
    }
@@ -1464,7 +1456,7 @@ function goAllWarranties(){
 
 function goIssueNew(){
  const shop = getCurrentShopInfo();
- if(shop.remainingCredits <= 0){
+ if(remainingFor(shop.id,shop.totalCredits) <= 0){
    alert("발행 가능 한도가 모두 소진되었습니다. 건수 충전 후 이용해주세요.");
    return;
  }
@@ -1481,13 +1473,13 @@ async function loadSessionProfile(authId){
  currentSession={
   id:data.shop_id, authId:data.id, role:data.role, shopName:data.shop_name, bizNo:data.biz_no,
   ownerName:data.owner_name, phone:data.phone, email:data.email, address:data.address||"",
-  remainingCredits:data.remaining_credits
+  totalCredits:data.total_credits
  };
  // 회원 목록 화면의 본사 계정 행은 DEFAULT_SUPER_SHOP(하드코딩된 기본값)을 그대로 보여주는데,
  // 새로고침마다 이 상수가 초기화되면서 실제 DB 값(충전된 건수, 수정한 상호명/연락처 등)을 덮어써
  // 보이는 버그가 있었습니다. 로그인/세션 복원 시점마다 실제 값으로 동기화해서 고칩니다.
  if(currentSession.id===DEFAULT_SUPER_ID){
-  DEFAULT_SUPER_SHOP.remainingCredits=currentSession.remainingCredits;
+  DEFAULT_SUPER_SHOP.totalCredits=currentSession.totalCredits;
   DEFAULT_SUPER_SHOP.shopName=currentSession.shopName;
   DEFAULT_SUPER_SHOP.bizNo=currentSession.bizNo;
   DEFAULT_SUPER_SHOP.ownerName=currentSession.ownerName;
@@ -1559,7 +1551,7 @@ function openMyAccountInfoModal(){
    <div class="field"><label>대표자명</label><input id="si-owner" value="${esc(shop.ownerName)}"></div>
    <div class="field"><label>대표 연락처</label><input id="si-phone" value="${esc(shop.phone)}"></div>
    <div class="field full"><label>주소</label><input id="si-address" value="${esc(shop.address)}"></div>
-   <div class="field full"><label>현재 발행 가능 잔여 한도</label><input value="${shop.remainingCredits}건" readonly style="background:var(--soft);color:var(--muted)"></div>
+   <div class="field full"><label>현재 발행 가능 잔여 한도</label><input value="${remainingFor(shop.id,shop.totalCredits)}건" readonly style="background:var(--soft);color:var(--muted)"></div>
   </div>
   <h4 class="pe-section-h">비밀번호 변경 (선택)</h4>
   <div class="row">
@@ -2180,7 +2172,7 @@ async function addMemberAccount(){
  const {data:insertedRow, error:insertErr} = await tempClient.from("members").insert({
    id: signUpData.user.id, shop_id: id, role: "member",
    shop_name: shopName, biz_no: bizNo, owner_name: ownerName,
-   phone, email, address, remaining_credits: 15
+   phone, email, address, total_credits: 15
  }).select().single();
  if(insertErr){
    alert("회원 프로필 저장 중 오류가 발생했습니다: "+insertErr.message+"\n(Supabase 대시보드 Authentication 설정에서 '이메일 확인' 옵션이 꺼져 있는지 확인해주세요.)");
@@ -2244,9 +2236,9 @@ async function confirmAddStoreCredits(id){
  if(!Number.isInteger(n) || n <= 0){ if(err){err.textContent="1건 이상의 정수만 입력할 수 있습니다.";err.style.display="block";} return; }
 
  const current = id===DEFAULT_SUPER_ID
-   ? (currentSession && currentSession.id===DEFAULT_SUPER_ID ? currentSession.remainingCredits : DEFAULT_SUPER_SHOP.remainingCredits)
-   : ((membersCache.find(x => x.id === id)||{}).remainingCredits||0);
- const ok = await updateShopCredits(id, Number(current||0) + n);
+   ? (currentSession && currentSession.id===DEFAULT_SUPER_ID ? currentSession.totalCredits : DEFAULT_SUPER_SHOP.totalCredits)
+   : ((membersCache.find(x => x.id === id)||{}).totalCredits||0);
+ const ok = await setTotalCredits(id, Number(current||0) + n);
  if(!ok){
   if(err){ err.textContent="건수 충전 저장에 실패했습니다. (서버 권한 문제일 수 있습니다 — 새로고침 후 다시 시도하거나 담당자에게 문의해주세요)"; err.style.display="block"; }
   return;
@@ -2255,14 +2247,10 @@ async function confirmAddStoreCredits(id){
  closeCommonModal();
  renderMemberList();
  updateNavVisibility();
- const finalCredits = id===DEFAULT_SUPER_ID ? DEFAULT_SUPER_SHOP.remainingCredits : ((membersCache.find(x=>x.id===id)||{}).remainingCredits||0);
- alert(`[${id}] 가맹점에 ${n}건이 충전되었습니다.\n현재 잔여 건수: ${finalCredits}건`);
+ const finalTotal = id===DEFAULT_SUPER_ID ? DEFAULT_SUPER_SHOP.totalCredits : ((membersCache.find(x=>x.id===id)||{}).totalCredits||0);
+ alert(`[${id}] 가맹점에 ${n}건이 충전되었습니다.\n현재 총충전: ${finalTotal}건 / 잔여: ${remainingFor(id,finalTotal)}건`);
 }
 
-function warrantyCountFor(shopId){return warranties.filter(w=>w.issuerId===shopId).length}
-// 총 충전 건수를 별도로 저장해두지 않으므로, "현재 잔여 + 지금까지 발행한 건수"로 역산합니다
-// (발행할 때마다 잔여 건수가 정확히 1씩만 깎이고 별도 환불 로직이 없으므로 항상 일치합니다).
-function totalGrantedFor(shopId,remaining){return Number(remaining||0)+warrantyCountFor(shopId)}
 function renderMemberList(){
  const members = getMembers();
  const tbody = document.getElementById("member-list-body");
@@ -2272,7 +2260,7 @@ function renderMemberList(){
  <tr>
    <td class="muted">-</td>
    <td><b>${esc(DEFAULT_SUPER_ID)}</b></td>
-   <td><b style="color:var(--ok);font-size:13px">${totalGrantedFor(DEFAULT_SUPER_ID,DEFAULT_SUPER_SHOP.remainingCredits)} / ${Number(DEFAULT_SUPER_SHOP.remainingCredits||0)}건</b></td>
+   <td><b style="color:var(--ok);font-size:13px">${Number(DEFAULT_SUPER_SHOP.totalCredits||0)} / ${remainingFor(DEFAULT_SUPER_ID,DEFAULT_SUPER_SHOP.totalCredits)}건</b></td>
    <td>${warrantyCountFor(DEFAULT_SUPER_ID)}건</td>
    <td>${esc(DEFAULT_SUPER_SHOP.shopName||"틴트랩 남부법원점")}</td>
    <td>${esc(DEFAULT_SUPER_SHOP.ownerName||"본사대표")}</td>
@@ -2288,7 +2276,7 @@ function renderMemberList(){
   <tr>
     <td>${m.branchNo!=null?esc(String(m.branchNo)):"-"}</td>
     <td><b>${esc(m.id)}</b></td>
-    <td><b style="color:var(--ok);font-size:13px">${totalGrantedFor(m.id,m.remainingCredits!==undefined?m.remainingCredits:15)} / ${m.remainingCredits !== undefined ? Number(m.remainingCredits) : 15}건</b></td>
+    <td><b style="color:var(--ok);font-size:13px">${Number(m.totalCredits!==undefined?m.totalCredits:15)} / ${remainingFor(m.id,m.totalCredits!==undefined?m.totalCredits:15)}건</b></td>
     <td>${warrantyCountFor(m.id)}건</td>
     <td>${esc(m.shopName)}</td>
     <td>${esc(m.ownerName)}</td>
@@ -2428,7 +2416,7 @@ async function issue(){
  if(!isAdminAuthed()){alert("관리자 로그인이 필요합니다.");show("home");return}
 
  const curShop = getCurrentShopInfo();
- if(curShop.remainingCredits <= 0){
+ if(remainingFor(curShop.id,curShop.totalCredits) <= 0){
   alert("발행 가능 한도가 모두 소진되었습니다. 건수 충전 후 이용해주세요.");
   return;
  }
@@ -2495,16 +2483,12 @@ async function issue(){
  };
  if(superNoOverride)w.no=superNoOverride; // 지정하지 않으면 DB가 자동으로 고유 번호를 발급합니다.
 
- // 보증서를 먼저 DB에 저장한 뒤에만 한도를 차감합니다 — 순서가 반대였을 때는 저장이 실패해도
- // 이미 차감된 한도가 복구되지 않는 문제가 있었습니다.
+ // 잔여 한도는 더 이상 발행 시점에 차감하지 않습니다 — "총충전"은 충전할 때만 바뀌는 고정값이고,
+ // 잔여는 항상 "총충전 − 실제 발행 건수"로 그 자리에서 계산되므로(remainingFor), 보증서 저장만
+ // 성공하면 한도는 자동으로 정확하게 반영됩니다.
  const {data:savedRow,error:insertErr}=await dbInsertWarranty(w);
  if(insertErr){ err.textContent="발행 중 오류가 발생했습니다: "+insertErr.message; err.style.display="block"; return; }
  w=savedRow;
-
- // 잔여 한도 1 차감. 보증서 저장엔 이미 성공했으므로, 한도 차감이 실패하더라도 보증서 발행 자체는
- // 되돌리지 않고(이미 발급된 문서이므로) 담당자에게 알려 수동으로 확인하도록 합니다.
- const creditOk=await deductOneCreditForIssuance(curShop.id);
- if(!creditOk) console.error("잔여 한도 차감 실패 — 보증서는 정상 발행되었으나 한도가 반영되지 않았습니다.", curShop.id);
 
  // 보증서 번호가 DB에서 막 발급된 뒤(w.no 확정 후)에 알림톡을 보내야 공유링크/번호가 정확합니다.
  await sendKakaoAlimtalk(w);
@@ -2512,7 +2496,6 @@ async function issue(){
  if(kakaoSaveErr) console.error("카카오 발송 상태 저장 실패", kakaoSaveErr);
 
  warranties.unshift(w);selected=w;clearForm();renderIssued(w);show("issued");
- if(!creditOk) alert("보증서는 정상 발행되었지만, 잔여 한도 차감에 실패했습니다. 관리자 > 회원점 관리에서 잔여 한도를 확인해주세요.");
  } finally {
   __issueInFlight=false;
   if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=prevBtnText||"보증서 발행하기";}
@@ -2876,7 +2859,7 @@ function renderAdmin(){
   if(isSuperAdmin()){
     userBadge.innerHTML = `<span class="pill badge-super">마스터 슈퍼관리자 접속 중</span>`;
   } else {
-    userBadge.innerHTML = `<span class="pill badge-member">가맹 회원 접속 중: ${esc(curShop.shopName)} (잔여 건수: ${curShop.remainingCredits}건)</span>`;
+    userBadge.innerHTML = `<span class="pill badge-member">가맹 회원 접속 중: ${esc(curShop.shopName)} (잔여 건수: ${remainingFor(curShop.id,curShop.totalCredits)}건)</span>`;
   }
  }
 
@@ -4239,7 +4222,7 @@ function renderProducts(){
 function renderAdminStats(){
   const existing=document.getElementById('admin-stats'); if(!existing||!isAdminAuthed())return;
   const me=getCurrentShopInfo(), my=warranties.filter(w=>w.issuerId===me.id), month=my.filter(w=>w.issued&&w.issued.startsWith(galleryMonth())).length;
-  existing.innerHTML=`<div class="adminStat"><span class="muted">이번 달 보증서</span><b>${month}건</b></div><div class="adminStat"><span class="muted">시공 갤러리</span><b>${galleryMonthlyCount(me.id)}/2건</b></div><div class="adminStat"><span class="muted">잔여 발행 한도</span><b>${me.remainingCredits}건</b></div>`;
+  existing.innerHTML=`<div class="adminStat"><span class="muted">이번 달 보증서</span><b>${month}건</b></div><div class="adminStat"><span class="muted">시공 갤러리</span><b>${galleryMonthlyCount(me.id)}/2건</b></div><div class="adminStat"><span class="muted">잔여 발행 한도</span><b>${remainingFor(me.id,me.totalCredits)}건</b></div>`;
   renderReservationAdmin();
 }
 
@@ -4402,7 +4385,7 @@ async function renderNbStats(){
    {n:monthWarranties.length+"건",l:"이번 달 신규 발행"},
    {n:myWarranties.filter(w=>status(w)==="보증 중").length+"건",l:"보증 유지 건수"},
    {n:myWarranties.length+"건",l:"누적 발행 보증서"},
-   {n:curShop.remainingCredits+"건",l:"잔여 발행 한도"}
+   {n:remainingFor(curShop.id,curShop.totalCredits)+"건",l:"잔여 발행 한도"}
   ];
  } else {
   // 로그아웃 상태(일반 방문자)에서는 보증서 개별 row에 접근할 수 없으므로(개인정보 보호),
