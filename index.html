@@ -1288,7 +1288,30 @@ const DEFAULT_PRECAUTIONS = [
   { title: "썬팅 시 주의 사항", desc: "완전 건조까지 약 2~10주 소요되며 이 기간 물잔상·기포는 자연스러운 현상입니다. 건조 전 창문 개폐는 자제하고, 기포·이물질은 직접 제거하지 마시고 시공점에 문의해 주세요. 암모니아 성분 세정제는 변색 우려가 있어 피해주세요." }
 ];
 
+// 보증서 "기본 양식"(주의사항/하단 문구)은 모든 기기/고객이 항상 같은 최신 내용을 보도록
+// DB(cert_config 테이블, 단일 행)를 단일 소스로 둡니다. CERT_CONFIG_CACHE가 채워져 있으면
+// 그걸 우선 쓰고, DB 연결 실패 시에만 과거 호환용으로 localStorage/기본값으로 내려갑니다.
+let CERT_CONFIG_CACHE=null;
+async function loadCertConfig(){
+  if(!sb)return;
+  try{
+    const {data,error}=await sb.from("cert_config").select("precautions,footer").eq("id",1).single();
+    if(error||!data)return;
+    CERT_CONFIG_CACHE={
+      precautions:Array.isArray(data.precautions)&&data.precautions.length?data.precautions:DEFAULT_PRECAUTIONS,
+      footer:data.footer||DEFAULT_CERT_TEMPLATE.footer
+    };
+  }catch(e){ console.error("loadCertConfig failed",e); }
+}
+async function saveCertConfigToDB(precautions,footer){
+  if(!sb)return false;
+  const {data,error}=await sb.from("cert_config").update({precautions,footer}).eq("id",1).select();
+  if(error){ console.error("saveCertConfigToDB",error); return false; }
+  if(!data||!data.length){ console.error("saveCertConfigToDB: 0 rows updated — DB 권한(RLS) 정책에 의해 차단됐을 수 있습니다."); return false; }
+  return true;
+}
 function getPrecautions(){
+  if(CERT_CONFIG_CACHE)return CERT_CONFIG_CACHE.precautions;
   return JSON.parse(localStorage.getItem(PRECAUTION_KEY)||"null") || DEFAULT_PRECAUTIONS;
 }
 function savePrecautions(arr){
@@ -1300,6 +1323,7 @@ const DEFAULT_CERT_TEMPLATE={
   footer:"시공내역 문의 : {shopName} ({phone})\n본 보증서는 시공 내역을 기반으로 자동 발급되었습니다."
 };
 function getCertTemplate(){
+  if(CERT_CONFIG_CACHE)return {footer:CERT_CONFIG_CACHE.footer};
   try{return Object.assign({},DEFAULT_CERT_TEMPLATE,JSON.parse(localStorage.getItem(CERT_TEMPLATE_KEY)||"{}"));}
   catch(e){return Object.assign({},DEFAULT_CERT_TEMPLATE);}
 }
@@ -1735,17 +1759,20 @@ function openPrecautionModal(){
   peUpdatePreview();
   document.getElementById("common-modal").classList.add("open");
 }
-function savePrecautionTemplate(){
+async function savePrecautionTemplate(){
   if(!isSuperAdmin()){ alert("슈퍼 관리자만 수정이 가능합니다."); return; }
   const precautions=peCollectPrecautions();
   if(!precautions.length){ alert("최소 1개의 주의사항을 입력해주세요."); return; }
   const t=peReadTemplate();
+  const ok=await saveCertConfigToDB(precautions,t.footer);
+  if(!ok){ alert("저장에 실패했습니다. (서버 권한 문제일 수 있습니다 — 새로고침 후 다시 시도하거나 담당자에게 문의해주세요)"); return; }
+  CERT_CONFIG_CACHE={precautions,footer:t.footer};
   savePrecautions(precautions);
   saveCertTemplate(t);
   document.querySelector("#common-modal .modal-box")?.classList.remove("wide");
   closeCommonModal();
   if(selected) renderDetail(selected);
-  alert("보증서 문구 설정이 저장되었습니다. 이후 발행/조회되는 보증서에 그대로 반영됩니다.");
+  alert("보증서 문구 설정이 저장되었습니다. 모든 기기에서 즉시 발행/조회되는 보증서에 그대로 반영됩니다.");
 }
 
 /* ===== 신차패키지 견적 카드 수정 (슈퍼관리자) ===== */
@@ -4360,6 +4387,7 @@ addItemRow();
 (async function boot(){
  // DB 연결(네트워크 장애 등)이 실패해도 홈/지점/패키지 등 DB와 무관한 화면은 정상 표시되도록 각 단계를 개별적으로 보호합니다.
  try{ await refreshMembersCache(); }catch(e){ console.error("refreshMembersCache failed",e); }
+ try{ await loadCertConfig(); }catch(e){ console.error("loadCertConfig failed",e); }
  renderBranches();renderPackagePage();
  const __initFlow=new URLSearchParams(location.search).get("flow");
  show((__initFlow==="pkgpay"||__initFlow==="pkgpayfail")?"package":"home");
