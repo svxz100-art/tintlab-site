@@ -2947,7 +2947,7 @@ function card(w){
  const kakaoPill = w.kakaoStatus === "발송 완료" 
   ? `<span class="pill kakao-done">💬 모바일 알림톡 완료</span>` 
   : `<span class="pill kakao-wait">💬 미발송</span>`;
- return `<div class="wcard" onclick="openDetail(${w.id})"><div class="wmain"><div class="wno">${w.no} · ${esc(shopNameLabel)}</div><div class="wtitle">${esc(itemsSummary(w))}</div><div class="wsub">${esc(w.customer)} · ${esc(w.phone)} · ${esc(w.vehicle||"차량번호 미입력")} (${esc(w.vehicleModel||"차종 미입력")})</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${kakaoPill}<span class="pill">${status(w)}</span></div></div>`
+ return `<div class="wcard" onclick="openWarrantyByNo('${esc(w.no)}')"><div class="wmain"><div class="wno">${w.no} · ${esc(shopNameLabel)}</div><div class="wtitle">${esc(itemsSummary(w))}</div><div class="wsub">${esc(w.customer)} · ${esc(w.phone)} · ${esc(w.vehicle||"차량번호 미입력")} (${esc(w.vehicleModel||"차종 미입력")})</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${kakaoPill}<span class="pill">${status(w)}</span></div></div>`
 }
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
@@ -3030,6 +3030,10 @@ function awGoPage(n){
 }
 
 function openDetail(id){selected=warranties.find(w=>w.id===id);renderDetail(selected);show("detail")}
+// 비로그인 방문자의 공개 조회 결과(customerSearch)는 warranties 캐시에 없는 DB 행이라
+// openDetail(id)로는 못 찾아 빈 화면만 뜨는 문제가 있었습니다. 공유 링크(#warranty=...)와
+// 똑같은, 로그인 여부와 무관하게 항상 동작하는 openHash() 경로를 그대로 재사용합니다.
+function openWarrantyByNo(no){ location.hash="#warranty="+encodeURIComponent(no); }
 
 async function customerSearch(){
  const raw=document.getElementById("s-query").value.trim();
