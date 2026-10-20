@@ -154,6 +154,7 @@ main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .pkgDateCell{font-size:13px;padding:7px 0;cursor:pointer;border-radius:4px;color:var(--ink)}
 .pkgDateCell:hover{background:var(--soft)}
 .pkgDateCell.pkgDateMuted{cursor:default}
+.pkgDateCell.pkgDatePast{opacity:.3;cursor:default;pointer-events:none}
 .pkgDateCell.pkgDateToday{border:1px solid var(--accent)}
 .pkgDateCell.pkgDateSelected{background:var(--accent);color:#fff;font-weight:700}
 .pkgDateFoot{display:flex;gap:8px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
@@ -785,7 +786,7 @@ function getGalleryShortTitle(){
    <option value="헤드라이트">
    <option value="A필러">
    <option value="B, C필러">
-   <option value="썬타페 D필러">
+   <option value="싼타페 D필러">
    <option value="사이드미러">
    <option value="범퍼 FRONT 사이드 2P">
    <option value="범퍼 REAR 사이드 2P">
@@ -851,7 +852,7 @@ function getGalleryShortTitle(){
      <button class="btn dark" onclick="openIssuedCustomerView()">고객용 보증서 확인하기</button>
     </div>
     <div class="issuedFooterNav noPrint">
-     <span onclick="show('admin')">보증서 목록</span>
+     <span onclick="goWarrantyList()">보증서 목록</span>
      <span onclick="goIssueNew()">새 보증서 발행</span>
      <span onclick="toggleIssuedMore()" aria-label="더보기">⋯</span>
     </div>
@@ -1564,6 +1565,10 @@ async function restoreSession(){
   updateNavVisibility();
   await dbFetchWarranties();
   try{ await migrateLocalGalleryToDB(); }catch(e){ console.error("migrateLocalGalleryToDB failed",e); }
+  // 첫 화면은 로그인 복원 전에 그려지므로, 복원 후 지금 보이는 화면을 다시 그려야
+  // 홈 통계(내 지점 수치)와 보증서 상세의 관리자 버튼(수정/삭제 등)이 제대로 나옵니다.
+  if(!document.getElementById("page-home").classList.contains("hidden")) renderNbStats();
+  if(!document.getElementById("page-detail").classList.contains("hidden") && selected) renderDetail(selected);
  }
 }
 
@@ -2487,12 +2492,14 @@ async function issue(){
  if(!isAdminAuthed()){alert("관리자 로그인이 필요합니다.");show("home");return}
 
  const curShop = getCurrentShopInfo();
- if(remainingFor(curShop.id,curShop.totalCredits) <= 0){
+ const editId=document.getElementById("f-edit-id").value;
+ // 기존 보증서 "수정"은 새로 발행하는 게 아니라 한도를 쓰지 않으므로, 잔여 한도 확인은 신규 발행일 때만 합니다.
+ const isEdit=!!editId && warranties.some(w=>String(w.id)===String(editId));
+ if(!isEdit && remainingFor(curShop.id,curShop.totalCredits) <= 0){
   alert("발행 가능 한도가 모두 소진되었습니다. 건수 충전 후 이용해주세요.");
   return;
  }
 
- const editId=document.getElementById("f-edit-id").value;
  const customer=document.getElementById("f-customer").value.trim(),phone=document.getElementById("f-phone").value.trim();
  const vehicle=document.getElementById("f-vehicle").value.trim(),vin=document.getElementById("f-vin").value.trim();
  const vehicleModel=document.getElementById("f-model").value.trim();
@@ -3035,7 +3042,12 @@ function openDetail(id){selected=warranties.find(w=>w.id===id);renderDetail(sele
 // 비로그인 방문자의 공개 조회 결과(customerSearch)는 warranties 캐시에 없는 DB 행이라
 // openDetail(id)로는 못 찾아 빈 화면만 뜨는 문제가 있었습니다. 공유 링크(#warranty=...)와
 // 똑같은, 로그인 여부와 무관하게 항상 동작하는 openHash() 경로를 그대로 재사용합니다.
-function openWarrantyByNo(no){ location.hash="#warranty="+encodeURIComponent(no); }
+// 주소창에 이미 같은 #warranty=... 가 남아 있으면(공유링크로 들어온 뒤 조회에서 같은 보증서를 누른 경우 등)
+// hashchange 이벤트가 발생하지 않아 아무 반응이 없었으므로, 그때는 openHash()를 직접 호출합니다.
+function openWarrantyByNo(no){
+ const h="#warranty="+encodeURIComponent(no);
+ if(location.hash===h) openHash(); else location.hash=h;
+}
 
 async function customerSearch(){
  const raw=document.getElementById("s-query").value.trim();
@@ -3296,7 +3308,8 @@ function exportToCSV(){
  warranties.forEach(w=>{
   const shopName = w.shopInfo ? w.shopInfo.shopName : "본사";
   const itemsStr=itemsOf(w).map(i=>`[${i.category}] ${i.detail}`).join(" ; ");
-  csv+=`"${w.no}","${shopName}","${w.customer}","${w.phone}","${w.vehicle}","${w.vehicleModel||''}","${w.amount}","${w.issued}","${w.expire}","${w.kakaoStatus||'미발송'}","${itemsStr.replaceAll('"','""')}"\n`;
+  const cell=v=>`"${String(v??"").replaceAll('"','""')}"`;
+  csv+=[w.no,shopName,w.customer,w.phone,w.vehicle,w.vehicleModel,w.amount,w.issued,w.expire,w.kakaoStatus||'미발송',itemsStr].map(cell).join(",")+"\n";
  });
  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
  const link=document.createElement("a");
@@ -3664,6 +3677,8 @@ function pkgRenderDateCalendar(){
   const cls=["pkgDateCell"];
   if(iso===todayISO)cls.push("pkgDateToday");
   if(iso===pkgDateSelectedISO)cls.push("pkgDateSelected");
+  // 지난 날짜는 예약할 수 없도록 흐리게 표시하고 선택되지 않게 합니다.
+  if(iso<todayISO){ cls.push("pkgDatePast"); cells+=`<div class="${cls.join(' ')}">${d}</div>`; continue; }
   cells+=`<div class="${cls.join(' ')}" onclick="pkgSelectDate('${iso}')">${d}</div>`;
  }
  popup.innerHTML=`
@@ -3748,7 +3763,7 @@ function pkgStep3Html(){
    ${c.tint?`<div class="pkgSummaryRow"><span>썬팅 필름 (${esc(tintFilmLabel(pkgWizard.tintFilm))})</span><span>+${won(c.tint)}</span></div>`:''}
    ${c.vehicle?`<div class="pkgSummaryRow"><span>차종 옵션</span><span>+${won(c.vehicle)}</span></div>`:''}
    ${pkgWizard.model3Heatline?`<div class="pkgSummaryRow"><span>모델3 열선 통시공</span><span>${c.heatlineQuote?'별도문의':`+${won(c.heatline)}`}</span></div>`:''}
-   ${pkgWizard.addons.map(cat=>`<div class="pkgSummaryRow"><span>${esc(cat)} 추가</span><span>+${won((addons.find(a=>a.category===cat)||{}).extra||0)}</span></div>`).join('')}
+   ${pkgWizard.addons.map(cat=>`<div class="pkgSummaryRow"><span>${esc(cat)} 추가${cat==="PPF"&&pkgWizard.ppfParts.length?` (${esc(pkgWizard.ppfParts.join(", "))})`:""}</span><span>+${won(cat==="PPF"?pkgPpfPartsTotal():((addons.find(a=>a.category===cat)||{}).extra||0))}</span></div>`).join('')}
    <div class="pkgSummaryTotal"><span>예상 금액</span><b>${won(c.total)}</b></div>
   </div>
 
