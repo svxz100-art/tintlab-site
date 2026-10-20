@@ -154,6 +154,7 @@ main{padding:34px 0 70px}main.wrap{padding-top:34px;padding-bottom:70px}
 .pkgDateCell{font-size:13px;padding:7px 0;cursor:pointer;border-radius:4px;color:var(--ink)}
 .pkgDateCell:hover{background:var(--soft)}
 .pkgDateCell.pkgDateMuted{cursor:default}
+.pkgDateCell.pkgDatePast{opacity:.3;cursor:default;pointer-events:none}
 .pkgDateCell.pkgDateToday{border:1px solid var(--accent)}
 .pkgDateCell.pkgDateSelected{background:var(--accent);color:#fff;font-weight:700}
 .pkgDateFoot{display:flex;gap:8px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
@@ -785,7 +786,7 @@ function getGalleryShortTitle(){
    <option value="헤드라이트">
    <option value="A필러">
    <option value="B, C필러">
-   <option value="썬타페 D필러">
+   <option value="싼타페 D필러">
    <option value="사이드미러">
    <option value="범퍼 FRONT 사이드 2P">
    <option value="범퍼 REAR 사이드 2P">
@@ -851,7 +852,7 @@ function getGalleryShortTitle(){
      <button class="btn dark" onclick="openIssuedCustomerView()">고객용 보증서 확인하기</button>
     </div>
     <div class="issuedFooterNav noPrint">
-     <span onclick="show('admin')">보증서 목록</span>
+     <span onclick="goWarrantyList()">보증서 목록</span>
      <span onclick="goIssueNew()">새 보증서 발행</span>
      <span onclick="toggleIssuedMore()" aria-label="더보기">⋯</span>
     </div>
@@ -1109,8 +1110,31 @@ const PACKAGE_IMG_KEY="tintrap_package_img_data";
 
 /* ===== 신차패키지 예약 + 결제 시스템 ===== */
 const RESERVATION_KEY="tintrap_reservations_v1";
-function getReservations(){return JSON.parse(localStorage.getItem(RESERVATION_KEY)||"[]")}
-function saveReservations(arr){localStorage.setItem(RESERVATION_KEY,JSON.stringify(arr))}
+// 예약은 예전엔 신청한 고객의 휴대폰(브라우저)에만 저장돼서 매장 관리자 화면에는 보이지 않았습니다.
+// 이제 고객이 신청하면 DB(package_reservations)에 저장하고, 관리자는 로그인 후 DB에서 불러옵니다(RESERVATION_CACHE).
+// 고객 기기의 localStorage는 결제 복귀 화면(handlePaymentReturn) 등 그 기기 안에서만 필요한 용도로 계속 씁니다.
+let RESERVATION_CACHE=null;
+function getLocalReservations(){try{return JSON.parse(localStorage.getItem(RESERVATION_KEY)||"[]")}catch(e){return []}}
+function getReservations(){return RESERVATION_CACHE||getLocalReservations()}
+function saveReservations(arr){if(RESERVATION_CACHE){RESERVATION_CACHE=arr;return;}localStorage.setItem(RESERVATION_KEY,JSON.stringify(arr))}
+function reservationToRow(r){return {id:r.id,no:r.no,branch_id:r.branchId||"",payment_status:r.paymentStatus||"예약 확인중",data:r}}
+async function loadReservations(){
+  if(!sb||!isAdminAuthed())return;
+  try{
+    const {data,error}=await sb.from("package_reservations").select("*").order("id",{ascending:false});
+    if(error){ console.error("loadReservations",error); return; }
+    RESERVATION_CACHE=(data||[]).map(row=>({...(row.data||{}),id:Number(row.id),no:row.no,branchId:row.branch_id,paymentStatus:row.payment_status}));
+  }catch(e){ console.error("loadReservations failed",e); }
+}
+// 관리자 기기에 예전 방식(localStorage)으로 남아있던 예약을 DB로 한 번 옮겨옵니다 (이미 있는 건 건너뜀).
+async function migrateLocalReservationsToDB(){
+  if(!sb||!isAdminAuthed())return;
+  const me=getCurrentShopInfo();
+  const local=getLocalReservations().filter(r=>r&&r.id&&(isSuperAdmin()||r.branchId===me.id));
+  if(!local.length)return;
+  const {error}=await sb.from("package_reservations").upsert(local.map(reservationToRow),{onConflict:"id",ignoreDuplicates:true});
+  if(error)console.error("migrateLocalReservationsToDB",error);
+}
 
 const PACKAGE_TIER_KEY="tintrap_package_tiers_v2";
 const DEFAULT_PACKAGE_TIERS=[
@@ -1157,8 +1181,37 @@ const DEFAULT_PACKAGE_TIERS_TESLA=DEFAULT_PACKAGE_TIERS.map(t=>({
 }));
 function pkgTierStorageKey(track){return track==="tesla"?PACKAGE_TIER_KEY_TESLA:PACKAGE_TIER_KEY}
 function pkgTierDefaults(track){return track==="tesla"?DEFAULT_PACKAGE_TIERS_TESLA:DEFAULT_PACKAGE_TIERS}
-function getPackageTiers(track){try{return JSON.parse(localStorage.getItem(pkgTierStorageKey(track))||"null")||pkgTierDefaults(track)}catch(e){return pkgTierDefaults(track)}}
-function savePackageTiers(arr,track){localStorage.setItem(pkgTierStorageKey(track),JSON.stringify(arr))}
+// 신차패키지 견적(패키지 카드)은 예전엔 수정한 PC의 브라우저에만 저장돼서 고객은 계속 기본 가격을 봤습니다.
+// 이제 DB(cert_config.package_tiers / package_tiers_tesla)를 단일 소스로 두고 PKG_TIERS_CACHE에 불러와 씁니다.
+// DB에 아직 저장된 값이 없으면(null) 기본값을 씁니다. DB 연결 실패 시에만 과거 호환용으로 localStorage로 내려갑니다.
+let PKG_TIERS_CACHE=null; // {normal:[...]|null, tesla:[...]|null}
+async function loadPackageTiers(){
+  if(!sb)return;
+  try{
+    const {data,error}=await sb.from("cert_config").select("package_tiers,package_tiers_tesla").eq("id",1).single();
+    if(error||!data){ if(error)console.error("loadPackageTiers",error); return; }
+    PKG_TIERS_CACHE={
+      normal:Array.isArray(data.package_tiers)&&data.package_tiers.length?data.package_tiers:null,
+      tesla:Array.isArray(data.package_tiers_tesla)&&data.package_tiers_tesla.length?data.package_tiers_tesla:null
+    };
+  }catch(e){ console.error("loadPackageTiers failed",e); }
+}
+function getPackageTiers(track){
+  if(PKG_TIERS_CACHE){ return PKG_TIERS_CACHE[track==="tesla"?"tesla":"normal"]||pkgTierDefaults(track); }
+  try{return JSON.parse(localStorage.getItem(pkgTierStorageKey(track))||"null")||pkgTierDefaults(track)}catch(e){return pkgTierDefaults(track)}
+}
+// 반환값: DB에 실제로 저장됐는지 여부. arr가 null이면 "기본값으로 되돌리기"입니다.
+async function savePackageTiers(arr,track){
+  if(!sb)return false;
+  const col=track==="tesla"?"package_tiers_tesla":"package_tiers";
+  const {data,error}=await sb.from("cert_config").update({[col]:arr}).eq("id",1).select("id");
+  if(error){ console.error("savePackageTiers",error); return false; }
+  if(!data||!data.length){ console.error("savePackageTiers: 0 rows updated — DB 권한(RLS) 정책에 의해 차단됐을 수 있습니다."); return false; }
+  if(!PKG_TIERS_CACHE)PKG_TIERS_CACHE={normal:null,tesla:null};
+  PKG_TIERS_CACHE[track==="tesla"?"tesla":"normal"]=arr;
+  try{ if(arr)localStorage.setItem(pkgTierStorageKey(track),JSON.stringify(arr)); else localStorage.removeItem(pkgTierStorageKey(track)); }catch(e){}
+  return true;
+}
 
 const VEHICLE_CLASSES=[
  {id:"standard",name:"일반 승용 / SUV",extra:0},
@@ -1564,6 +1617,11 @@ async function restoreSession(){
   updateNavVisibility();
   await dbFetchWarranties();
   try{ await migrateLocalGalleryToDB(); }catch(e){ console.error("migrateLocalGalleryToDB failed",e); }
+  await loadAdminSharedData();
+  // 첫 화면은 로그인 복원 전에 그려지므로, 복원 후 지금 보이는 화면을 다시 그려야
+  // 홈 통계(내 지점 수치)와 보증서 상세의 관리자 버튼(수정/삭제 등)이 제대로 나옵니다.
+  if(!document.getElementById("page-home").classList.contains("hidden")) renderNbStats();
+  if(!document.getElementById("page-detail").classList.contains("hidden") && selected) renderDetail(selected);
  }
 }
 
@@ -1594,13 +1652,25 @@ async function adminLogin(){
  updateNavVisibility();
  await dbFetchWarranties();
  try{ await migrateLocalGalleryToDB(); }catch(e){ console.error("migrateLocalGalleryToDB failed",e); }
+ await loadAdminSharedData();
  show(pendingAdminTarget);
 }
 
+// 로그인한 관리자만 볼 수 있는 예약/상담 내역을 DB에서 불러옵니다(관리자 기기에 남아있던 예전 내역은 먼저 DB로 옮김).
+async function loadAdminSharedData(){
+ try{ await migrateLocalReservationsToDB(); }catch(e){ console.error("migrateLocalReservationsToDB failed",e); }
+ try{ await migrateLocalConsultationsToDB(); }catch(e){ console.error("migrateLocalConsultationsToDB failed",e); }
+ try{ await loadReservations(); }catch(e){ console.error("loadReservations failed",e); }
+ try{ await loadConsultations(); }catch(e){ console.error("loadConsultations failed",e); }
+ if(!document.getElementById("page-admin").classList.contains("hidden")) renderReservationAdmin();
+ if(!document.getElementById("page-consult").classList.contains("hidden") && !CONSULT_STATE) renderConsultList();
+}
 async function adminLogout(){
  if(sb){ try{ await sb.auth.signOut(); }catch(e){ console.error("signOut",e); } }
  currentSession=null;
  warranties=[];
+ RESERVATION_CACHE=null;
+ CONSULT_CACHE=null;
  if(PREVIEW_DEMO_MODE){ PREVIEW_DEMO_MODE=false; activatePreviewDemoMode(); }
  updateNavVisibility();
  show("home");
@@ -1911,7 +1981,6 @@ function pkgEditRender(){
 }
 function pkgEditResetDefault(){
   if(!confirm((PKG_EDIT_TRACK==="tesla"?"테슬라 전용 신차패키지":"신차패키지")+" 견적 내용을 기본값으로 초기화하시겠습니까? 지금까지 직접 수정한 내용은 사라집니다."))return;
-  localStorage.removeItem(pkgTierStorageKey(PKG_EDIT_TRACK));
   PKG_EDIT_STATE=JSON.parse(JSON.stringify(pkgTierDefaults(PKG_EDIT_TRACK)));
   pkgEditRender();
   alert("기본값으로 초기화되었습니다. 저장하기를 눌러야 실제로 반영됩니다.");
@@ -1944,22 +2013,48 @@ function pkgEditCancel(){
   document.querySelector("#common-modal .modal-box")?.classList.remove("wide");
   closeCommonModal();
 }
-function pkgEditSave(){
+async function pkgEditSave(){
   if(!isSuperAdmin()){ alert("슈퍼 관리자만 수정이 가능합니다."); return; }
   pkgEditCollect();
   for(const t of PKG_EDIT_STATE){
     if(!t.name){ alert("패키지명을 입력해주세요."); return; }
   }
-  savePackageTiers(PKG_EDIT_STATE,PKG_EDIT_TRACK);
+  const ok=await savePackageTiers(PKG_EDIT_STATE,PKG_EDIT_TRACK);
+  if(!ok){ alert("저장에 실패했습니다. (서버 권한 문제이거나 DB 설정(SQL)이 아직 적용되지 않았을 수 있습니다 — 새로고침 후 다시 시도하거나 담당자에게 문의해주세요)"); return; }
   document.querySelector("#common-modal .modal-box")?.classList.remove("wide");
   closeCommonModal();
-  alert((PKG_EDIT_TRACK==="tesla"?"테슬라 전용 신차패키지":"신차패키지")+" 견적 내용이 저장되었습니다. 신차패키지 견적 페이지에 바로 반영됩니다.");
+  alert((PKG_EDIT_TRACK==="tesla"?"테슬라 전용 신차패키지":"신차패키지")+" 견적 내용이 저장되었습니다. 모든 기기의 신차패키지 견적 페이지에 바로 반영됩니다.");
 }
 
 /* ===== 신차패키지 고객상담용 페이지 ===== */
 const CONSULT_KEY="tintrap_consultations_v1";
-function getConsultations(){try{return JSON.parse(localStorage.getItem(CONSULT_KEY)||"[]")}catch(e){return []}}
-function saveConsultations(arr){localStorage.setItem(CONSULT_KEY,JSON.stringify(arr))}
+// 상담 견적은 예전엔 저장한 PC에만 있어서, 고객에게 보낸 링크를 고객이 열면 견적서가 보이지 않았습니다.
+// 이제 DB(consultations)에 저장하고(CONSULT_CACHE), 고객은 링크의 id로 그 1건만 조회합니다(public_consultation_by_id).
+let CONSULT_CACHE=null;
+function getLocalConsultations(){try{return JSON.parse(localStorage.getItem(CONSULT_KEY)||"[]")}catch(e){return []}}
+function getConsultations(){return CONSULT_CACHE||getLocalConsultations()}
+function saveConsultations(arr){if(CONSULT_CACHE){CONSULT_CACHE=arr;return;}localStorage.setItem(CONSULT_KEY,JSON.stringify(arr))}
+async function loadConsultations(){
+  if(!sb||!isAdminAuthed())return;
+  try{
+    const {data,error}=await sb.from("consultations").select("*");
+    if(error){ console.error("loadConsultations",error); return; }
+    CONSULT_CACHE=(data||[]).map(row=>({...(row.data||{}),id:row.id,issuerId:row.issuer_id}));
+  }catch(e){ console.error("loadConsultations failed",e); }
+}
+async function migrateLocalConsultationsToDB(){
+  if(!sb||!isAdminAuthed())return;
+  const me=getCurrentShopInfo();
+  const local=getLocalConsultations().filter(c=>c&&c.id&&(isSuperAdmin()||c.issuerId===me.id));
+  if(!local.length)return;
+  const {error}=await sb.from("consultations").upsert(local.map(c=>({id:c.id,issuer_id:c.issuerId||me.id,data:c})),{onConflict:"id",ignoreDuplicates:true});
+  if(error)console.error("migrateLocalConsultationsToDB",error);
+}
+// 고객용 링크 id는 추측할 수 없도록 임의 문자열로 만듭니다(견적서에 고객 이름·연락처가 들어가므로).
+function newConsultId(){
+  try{ if(crypto&&crypto.randomUUID)return "CS"+crypto.randomUUID().replace(/-/g,""); }catch(e){}
+  return "CS"+Date.now()+Math.random().toString(36).slice(2,12);
+}
 
 let CONSULT_STATE=null;
 let CONSULT_EDIT_ID=null;
@@ -2015,9 +2110,14 @@ function openConsultation(id){
  CONSULT_STATE=JSON.parse(JSON.stringify(c));
  renderConsultEditor();
 }
-function deleteConsultation(id){
+async function deleteConsultation(id){
  if(!isAdminAuthed()){ alert("삭제 권한이 없습니다."); return; }
  if(!confirm("이 상담 내역을 삭제하시겠습니까?"))return;
+ if(CONSULT_CACHE&&sb){
+  const {data,error}=await sb.from("consultations").delete().eq("id",id).select("id");
+  if(error||!data||!data.length){ console.error("deleteConsultation",error); alert("삭제에 실패했습니다. (서버 권한 문제일 수 있습니다 — 새로고침 후 다시 시도해주세요)"); return; }
+ }
+ try{ localStorage.setItem(CONSULT_KEY,JSON.stringify(getLocalConsultations().filter(x=>x.id!==id))); }catch(e){}
  saveConsultations(getConsultations().filter(x=>x.id!==id));
  renderConsultList();
 }
@@ -2159,21 +2259,27 @@ function consultDocInnerHtml(c){
  `;
 }
 
-function saveConsultation(){
+async function saveConsultation(){
  if(!isAdminAuthed()){ alert("관리자 로그인이 필요합니다."); return; }
  consultCollect();
  if(!CONSULT_STATE.customerName){ alert("고객명을 입력해주세요."); return; }
  const me=getCurrentShopInfo();
  const list=getConsultations();
+ let rec, idx=-1;
  if(CONSULT_EDIT_ID){
-  const idx=list.findIndex(x=>x.id===CONSULT_EDIT_ID);
-  if(idx>-1)list[idx]=Object.assign({},CONSULT_STATE,{id:CONSULT_EDIT_ID,issuerId:list[idx].issuerId,createdAt:list[idx].createdAt});
+  idx=list.findIndex(x=>x.id===CONSULT_EDIT_ID);
+  rec=Object.assign({},CONSULT_STATE,{id:CONSULT_EDIT_ID,issuerId:idx>-1?list[idx].issuerId:me.id,createdAt:idx>-1?list[idx].createdAt:(CONSULT_STATE.createdAt||fmt(new Date()))});
  }else{
-  CONSULT_EDIT_ID="CS"+Date.now();
-  CONSULT_STATE.createdAt=fmt(new Date());
-  list.unshift(Object.assign({},CONSULT_STATE,{id:CONSULT_EDIT_ID,issuerId:me.id}));
+  rec=Object.assign({},CONSULT_STATE,{id:newConsultId(),issuerId:me.id,createdAt:fmt(new Date())});
  }
- saveConsultations(list);
+ if(!sb){ alert("서버 연결을 사용할 수 없습니다. 실제 배포된 사이트에서 이용해주세요."); return; }
+ const {data,error}=await sb.from("consultations").upsert({id:rec.id,issuer_id:rec.issuerId,data:rec},{onConflict:"id"}).select("id");
+ if(error||!data||!data.length){ console.error("saveConsultation",error); alert("상담 내역 저장에 실패했습니다. (서버 권한 문제이거나 DB 설정(SQL)이 아직 적용되지 않았을 수 있습니다)"); return; }
+ if(!CONSULT_CACHE)CONSULT_CACHE=getLocalConsultations();
+ const cur=CONSULT_CACHE.findIndex(x=>x.id===rec.id);
+ if(cur>-1)CONSULT_CACHE[cur]=rec; else CONSULT_CACHE.unshift(rec);
+ CONSULT_EDIT_ID=rec.id;
+ CONSULT_STATE.createdAt=rec.createdAt;
  alert("상담 내역이 저장되었습니다.");
 }
 
@@ -2487,12 +2593,14 @@ async function issue(){
  if(!isAdminAuthed()){alert("관리자 로그인이 필요합니다.");show("home");return}
 
  const curShop = getCurrentShopInfo();
- if(remainingFor(curShop.id,curShop.totalCredits) <= 0){
+ const editId=document.getElementById("f-edit-id").value;
+ // 기존 보증서 "수정"은 새로 발행하는 게 아니라 한도를 쓰지 않으므로, 잔여 한도 확인은 신규 발행일 때만 합니다.
+ const isEdit=!!editId && warranties.some(w=>String(w.id)===String(editId));
+ if(!isEdit && remainingFor(curShop.id,curShop.totalCredits) <= 0){
   alert("발행 가능 한도가 모두 소진되었습니다. 건수 충전 후 이용해주세요.");
   return;
  }
 
- const editId=document.getElementById("f-edit-id").value;
  const customer=document.getElementById("f-customer").value.trim(),phone=document.getElementById("f-phone").value.trim();
  const vehicle=document.getElementById("f-vehicle").value.trim(),vin=document.getElementById("f-vin").value.trim();
  const vehicleModel=document.getElementById("f-model").value.trim();
@@ -3035,7 +3143,12 @@ function openDetail(id){selected=warranties.find(w=>w.id===id);renderDetail(sele
 // 비로그인 방문자의 공개 조회 결과(customerSearch)는 warranties 캐시에 없는 DB 행이라
 // openDetail(id)로는 못 찾아 빈 화면만 뜨는 문제가 있었습니다. 공유 링크(#warranty=...)와
 // 똑같은, 로그인 여부와 무관하게 항상 동작하는 openHash() 경로를 그대로 재사용합니다.
-function openWarrantyByNo(no){ location.hash="#warranty="+encodeURIComponent(no); }
+// 주소창에 이미 같은 #warranty=... 가 남아 있으면(공유링크로 들어온 뒤 조회에서 같은 보증서를 누른 경우 등)
+// hashchange 이벤트가 발생하지 않아 아무 반응이 없었으므로, 그때는 openHash()를 직접 호출합니다.
+function openWarrantyByNo(no){
+ const h="#warranty="+encodeURIComponent(no);
+ if(location.hash===h) openHash(); else location.hash=h;
+}
 
 async function customerSearch(){
  const raw=document.getElementById("s-query").value.trim();
@@ -3296,7 +3409,8 @@ function exportToCSV(){
  warranties.forEach(w=>{
   const shopName = w.shopInfo ? w.shopInfo.shopName : "본사";
   const itemsStr=itemsOf(w).map(i=>`[${i.category}] ${i.detail}`).join(" ; ");
-  csv+=`"${w.no}","${shopName}","${w.customer}","${w.phone}","${w.vehicle}","${w.vehicleModel||''}","${w.amount}","${w.issued}","${w.expire}","${w.kakaoStatus||'미발송'}","${itemsStr.replaceAll('"','""')}"\n`;
+  const cell=v=>`"${String(v??"").replaceAll('"','""')}"`;
+  csv+=[w.no,shopName,w.customer,w.phone,w.vehicle,w.vehicleModel,w.amount,w.issued,w.expire,w.kakaoStatus||'미발송',itemsStr].map(cell).join(",")+"\n";
  });
  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
  const link=document.createElement("a");
@@ -3664,6 +3778,8 @@ function pkgRenderDateCalendar(){
   const cls=["pkgDateCell"];
   if(iso===todayISO)cls.push("pkgDateToday");
   if(iso===pkgDateSelectedISO)cls.push("pkgDateSelected");
+  // 지난 날짜는 예약할 수 없도록 흐리게 표시하고 선택되지 않게 합니다.
+  if(iso<todayISO){ cls.push("pkgDatePast"); cells+=`<div class="${cls.join(' ')}">${d}</div>`; continue; }
   cells+=`<div class="${cls.join(' ')}" onclick="pkgSelectDate('${iso}')">${d}</div>`;
  }
  popup.innerHTML=`
@@ -3748,7 +3864,7 @@ function pkgStep3Html(){
    ${c.tint?`<div class="pkgSummaryRow"><span>썬팅 필름 (${esc(tintFilmLabel(pkgWizard.tintFilm))})</span><span>+${won(c.tint)}</span></div>`:''}
    ${c.vehicle?`<div class="pkgSummaryRow"><span>차종 옵션</span><span>+${won(c.vehicle)}</span></div>`:''}
    ${pkgWizard.model3Heatline?`<div class="pkgSummaryRow"><span>모델3 열선 통시공</span><span>${c.heatlineQuote?'별도문의':`+${won(c.heatline)}`}</span></div>`:''}
-   ${pkgWizard.addons.map(cat=>`<div class="pkgSummaryRow"><span>${esc(cat)} 추가</span><span>+${won((addons.find(a=>a.category===cat)||{}).extra||0)}</span></div>`).join('')}
+   ${pkgWizard.addons.map(cat=>`<div class="pkgSummaryRow"><span>${esc(cat)} 추가${cat==="PPF"&&pkgWizard.ppfParts.length?` (${esc(pkgWizard.ppfParts.join(", "))})`:""}</span><span>+${won(cat==="PPF"?pkgPpfPartsTotal():((addons.find(a=>a.category===cat)||{}).extra||0))}</span></div>`).join('')}
    <div class="pkgSummaryTotal"><span>예상 금액</span><b>${won(c.total)}</b></div>
   </div>
 
@@ -3779,8 +3895,10 @@ async function pkgSubmitAndPay(){
  const branch=branches.find(b=>b.id===pkgWizard.branchId)||branches[0];
  const tier=pkgSelectedTier();
  const c=pkgCalcTotal();
- const list=getReservations();
- const no="PKG-"+new Date().getFullYear()+"-"+String(list.length+1).padStart(6,"0");
+ const list=getLocalReservations();
+ // 예전엔 "이 기기에 저장된 예약 수+1"로 번호를 매겨 고객마다 번호가 겹쳤으므로, 날짜+임의 문자로 만듭니다.
+ const now=new Date();
+ const no="PKG-"+String(now.getFullYear()).slice(2)+String(now.getMonth()+1).padStart(2,"0")+String(now.getDate()).padStart(2,"0")+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
  const reservation={
   id:Date.now(), no,
   packageId:tier.id, packageName:tier.name,
@@ -3798,7 +3916,19 @@ async function pkgSubmitAndPay(){
   orderId:"", paymentKey:"", paidAmount:0,
   createdAt:fmt(new Date())
  };
- list.unshift(reservation); saveReservations(list);
+ const submitBtn=document.querySelector('#pkg-step-body .pkgNav .btn.dark');
+ if(submitBtn){ if(submitBtn.disabled)return; submitBtn.disabled=true; submitBtn.textContent="접수 중..."; }
+ if(!sb){ err.textContent="서버 연결에 실패했습니다. 잠시 후 다시 시도하시거나 매장으로 전화 문의해주세요."; err.style.display="block"; if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="예약 신청하기";} return; }
+ const {error:insErr}=await sb.from("package_reservations").insert(reservationToRow(reservation));
+ if(insErr){
+  console.error("pkgSubmitAndPay insert",insErr);
+  err.textContent="예약 접수 중 오류가 발생했습니다. 잠시 후 다시 시도하시거나 매장으로 전화 문의해주세요.";
+  err.style.display="block";
+  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="예약 신청하기";}
+  return;
+ }
+ // 이 기기에도 사본을 남겨둡니다(결제 복귀 화면 등 이 기기 안에서만 쓰는 용도).
+ try{ list.unshift(reservation); localStorage.setItem(RESERVATION_KEY,JSON.stringify(list)); }catch(e){}
 
  const box=document.getElementById('package-page-content');
  if(box){
@@ -3813,7 +3943,8 @@ function handlePaymentReturn(box){
  const flow=params.get("flow");
  if(flow!=="pkgpay" && flow!=="pkgpayfail")return false;
  const rid=Number(params.get("rid"));
- const list=getReservations();
+ const list=getLocalReservations();
+ const saveReservations=arr=>localStorage.setItem(RESERVATION_KEY,JSON.stringify(arr));
  const idx=list.findIndex(r=>r.id===rid);
  box.classList.add('hasWizard');
  if(idx===-1){
@@ -4473,10 +4604,15 @@ function openReservationDetail(id){
  `;
  document.getElementById("common-modal").classList.add("open");
 }
-function setReservationStatus(id,status){
+async function setReservationStatus(id,status){
  const list=getReservations();
  const idx=list.findIndex(x=>x.id===id);
  if(idx===-1)return;
+ if(RESERVATION_CACHE&&sb){
+  const updated={...list[idx],paymentStatus:status};
+  const {data,error}=await sb.from("package_reservations").update({payment_status:status,data:updated}).eq("id",id).select("id");
+  if(error||!data||!data.length){ console.error("setReservationStatus",error); alert("상태 변경에 실패했습니다. (서버 권한 문제일 수 있습니다 — 새로고침 후 다시 시도해주세요)"); return; }
+ }
  list[idx].paymentStatus=status;
  saveReservations(list);
  closeCommonModal();
@@ -4502,7 +4638,12 @@ async function openHash(){
  }
  const csId=params.get("consult");
  if(csId){
-  const c=getConsultations().find(x=>x.id===csId);
+  let c=getConsultations().find(x=>x.id===csId);
+  if(!c && sb){
+   const {data,error}=await sb.rpc("public_consultation_by_id",{p_id:csId});
+   if(error)console.error("public_consultation_by_id",error);
+   c=data||null;
+  }
   if(c){
    renderConsultReadOnly(c);
    if(params.get("action")==="print")setTimeout(()=>window.print(),400);
@@ -4516,6 +4657,7 @@ addItemRow();
  // DB 연결(네트워크 장애 등)이 실패해도 홈/지점/패키지 등 DB와 무관한 화면은 정상 표시되도록 각 단계를 개별적으로 보호합니다.
  try{ await refreshMembersCache(); }catch(e){ console.error("refreshMembersCache failed",e); }
  try{ await loadCertConfig(); }catch(e){ console.error("loadCertConfig failed",e); }
+ try{ await loadPackageTiers(); }catch(e){ console.error("loadPackageTiers failed",e); }
  try{ await loadGallery(); }catch(e){ console.error("loadGallery failed",e); }
  renderBranches();renderPackagePage();
  const __initFlow=new URLSearchParams(location.search).get("flow");
