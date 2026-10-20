@@ -1563,6 +1563,7 @@ async function restoreSession(){
  if(ok){
   updateNavVisibility();
   await dbFetchWarranties();
+  try{ await migrateLocalGalleryToDB(); }catch(e){ console.error("migrateLocalGalleryToDB failed",e); }
  }
 }
 
@@ -1592,6 +1593,7 @@ async function adminLogin(){
  err.style.display="none";
  updateNavVisibility();
  await dbFetchWarranties();
+ try{ await migrateLocalGalleryToDB(); }catch(e){ console.error("migrateLocalGalleryToDB failed",e); }
  show(pendingAdminTarget);
 }
 
@@ -3869,8 +3871,64 @@ function pkgResultHtml(success, r){
 function reservationIsPending(r){ return String(r.paymentStatus||"").includes("승인확인필요"); }
 
 const GALLERY_KEY='tintrap_gallery_v1';
-function getGallery(){return JSON.parse(localStorage.getItem(GALLERY_KEY)||'[]')}
-function saveGallery(arr){localStorage.setItem(GALLERY_KEY,JSON.stringify(arr))}
+// 시공 갤러리 게시물은 예전엔 localStorage에만 저장돼서, 등록한 그 컴퓨터(브라우저)에서만 보이고
+// 다른 PC·휴대폰에서는 "등록된 시공 사례가 없습니다"로 나오는 문제가 있었습니다(사진만 Storage에 있었음).
+// 이제 DB(gallery_posts 테이블)를 단일 소스로 두고 GALLERY_CACHE에 불러와 씁니다. DB를 쓸 수 없는
+// 미리보기 환경(sb 없음)이나 DB 조회 실패 시에만 과거 호환용으로 localStorage로 내려갑니다.
+let GALLERY_CACHE=null;
+function getLocalGallery(){try{return JSON.parse(localStorage.getItem(GALLERY_KEY)||'[]')}catch(e){return []}}
+function getGallery(){return GALLERY_CACHE||getLocalGallery()}
+function saveGallery(arr){if(GALLERY_CACHE){GALLERY_CACHE=arr;return;}localStorage.setItem(GALLERY_KEY,JSON.stringify(arr))}
+function galleryRowToObj(r){
+  return {id:r.id,issuerId:r.issuer_id,shopName:r.shop_name,shopPhone:r.shop_phone,shopAddress:r.shop_address,
+    vehicleModel:r.vehicle_model,filmName:r.film_name,title:r.title,productSummary:r.product_summary,description:r.description,
+    images:Array.isArray(r.images)?r.images:[],views:Number(r.views||0),deleted:!!r.deleted,deletedAt:r.deleted_at,createdAt:r.created_at};
+}
+function galleryObjToRow(g){
+  return {id:g.id,issuer_id:g.issuerId,shop_name:g.shopName||'',shop_phone:g.shopPhone||'',shop_address:g.shopAddress||'',
+    vehicle_model:g.vehicleModel||'',film_name:g.filmName||'',title:g.title||'',product_summary:g.productSummary||'',description:g.description||'',
+    images:Array.isArray(g.images)?g.images:[],views:Number(g.views||0),deleted:!!g.deleted,deleted_at:g.deletedAt||null,created_at:g.createdAt||fmt(new Date())};
+}
+async function loadGallery(){
+  if(!sb)return;
+  const {data,error}=await sb.from('gallery_posts').select('*');
+  if(error){console.error('loadGallery',error);return;}
+  GALLERY_CACHE=(data||[]).map(galleryRowToObj);
+}
+// 0행이 바뀐 경우(RLS 권한으로 조용히 막힌 경우)도 실패로 처리합니다 — cert_config 저장과 같은 패턴.
+async function dbUpdateGalleryPost(id,patch){
+  const {data,error}=await sb.from('gallery_posts').update(patch).eq('id',id).select();
+  if(error){console.error('dbUpdateGalleryPost',error);return false;}
+  if(!data||!data.length){console.error('dbUpdateGalleryPost: 0 rows updated — DB 권한(RLS) 정책에 의해 차단됐을 수 있습니다.');return false;}
+  return true;
+}
+// 예전 방식으로 이 브라우저의 localStorage에만 남아 있는 게시물을 DB로 한 번 옮깁니다.
+// 관리자가 그 게시물을 등록했던 컴퓨터에서 로그인하면 자동으로 실행되고, 이미 DB에 있는 id는 건너뜁니다.
+// 본인 지점 게시물만 옮기며, 슈퍼관리자는 이 브라우저에 있는 모든 지점의 게시물을 옮깁니다.
+async function migrateLocalGalleryToDB(){
+  if(!sb||!currentSession||!GALLERY_CACHE)return;
+  const have=new Set(GALLERY_CACHE.map(g=>String(g.id)));
+  const pending=getLocalGallery().filter(g=>g&&g.id!=null&&!have.has(String(g.id))&&(isSuperAdmin()||g.issuerId===currentSession.id));
+  if(!pending.length)return;
+  let moved=0;
+  for(const g of pending){
+    try{
+      // 사진을 Storage로 옮기기 전(base64로 localStorage에 저장하던 시절)의 게시물은 지금 업로드합니다.
+      const images=[];
+      for(const src of (Array.isArray(g.images)?g.images:[])){
+        if(typeof src==='string'&&src.startsWith('data:')){
+          const blob=await (await fetch(src)).blob();
+          images.push(await uploadGalleryImage(blob,g.issuerId||currentSession.id));
+        } else images.push(src);
+      }
+      const row=galleryObjToRow({...g,images});
+      const {error}=await sb.from('gallery_posts').upsert(row,{onConflict:'id',ignoreDuplicates:true});
+      if(error){console.error('migrateLocalGalleryToDB',g.id,error);continue;}
+      GALLERY_CACHE.push(galleryRowToObj(row)); moved++;
+    }catch(e){console.error('migrateLocalGalleryToDB',g.id,e);}
+  }
+  if(moved){console.info('migrateLocalGalleryToDB: '+moved+'건을 DB로 옮겼습니다.');renderGallery();renderHomePopularGallery();}
+}
 function galleryMonth(d=new Date()){return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')}
 // 소프트 삭제(deleted 플래그)된 게시물도 포함해서 세야 합니다 — 삭제해도 이번 달 등록 한도가
 // 다시 채워지면 안 된다는 의도된 동작이라, 월별 건수는 getGallery()의 원본 배열 기준으로 셉니다.
@@ -3980,7 +4038,7 @@ function galleryCardHtml(g){
   const first=(g.images&&g.images[0])||'';
   const views=Number(g.views||0);
   return `<article class="galleryCard" onclick="openGalleryDetail('${esc(g.id)}')">
-    <div class="galleryThumb">${first?`<img src="${first}" alt="${esc(g.title)}">`:'<div class="galleryNoImg">대표 사진 없음</div>'}</div>
+    <div class="galleryThumb">${first?`<img src="${esc(first)}" alt="${esc(g.title)}">`:'<div class="galleryNoImg">대표 사진 없음</div>'}</div>
     <div class="galleryBody"><h3>${esc(g.title||[g.vehicleModel,g.filmName].filter(Boolean).join(' · '))}</h3><p>${esc(g.productSummary||g.description||'')}</p>
       <div class="galleryMeta"><span>${esc(g.shopName||'-')}</span><span>조회 ${views.toLocaleString()}</span></div>
     </div></article>`;
@@ -3992,6 +4050,8 @@ function openGalleryDetail(id){
   if(idx<0){alert('시공 사례를 찾을 수 없습니다.');return;}
   arr[idx].views=Number(arr[idx].views||0)+1;
   saveGallery(arr);
+  // 조회수는 비로그인 방문자도 올려야 하므로 테이블 직접 수정 대신 조회수만 +1 하는 RPC를 씁니다.
+  if(GALLERY_CACHE&&sb){sb.rpc('increment_gallery_views',{p_id:String(arr[idx].id)}).then(({error})=>{if(error)console.error('increment_gallery_views',error);});}
   window.__currentGalleryDetailId=arr[idx].id;
   show('gallery-detail');
 }
@@ -4101,7 +4161,7 @@ function galleryStartEdit(id){
   renderGalleryAdminBox();
   document.getElementById('gallery-admin-box')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function saveGalleryEdit(){
+async function saveGalleryEdit(){
   if(!GALLERY_EDIT_ID)return;
   const arr=getGallery();
   const idx=arr.findIndex(g=>g.id===GALLERY_EDIT_ID);
@@ -4111,7 +4171,12 @@ function saveGalleryEdit(){
   const product=(document.getElementById('g-product')?.value||'').trim();
   const desc=(document.getElementById('g-desc')?.value||'').trim();
   if(!model||!film||!product){ alert('차종, 필름 이름, 제품 요약은 필수입니다.'); return; }
-  arr[idx]={...arr[idx],vehicleModel:model,filmName:film,title:[model,film].filter(Boolean).join(' · '),productSummary:product,description:desc};
+  const title=[model,film].filter(Boolean).join(' · ');
+  if(GALLERY_CACHE&&sb){
+    const ok=await dbUpdateGalleryPost(GALLERY_EDIT_ID,{vehicle_model:model,film_name:film,title,product_summary:product,description:desc});
+    if(!ok){ alert('수정 저장에 실패했습니다. (서버 권한 문제일 수 있습니다 — 새로고침 후 다시 시도하거나 담당자에게 문의해주세요)'); return; }
+  }
+  arr[idx]={...arr[idx],vehicleModel:model,filmName:film,title,productSummary:product,description:desc};
   saveGallery(arr);
   resetGalleryUploadState();
   renderGallery();
@@ -4119,13 +4184,18 @@ function saveGalleryEdit(){
 }
 // 삭제는 소프트 삭제입니다 — 목록/상세 화면에서는 사라지지만, 월별 등록 건수(galleryMonthlyCount)는
 // 그대로 유지되어 이번 달 등록 한도가 다시 채워지지 않습니다 (의도된 동작).
-function deleteGalleryPost(id){
+async function deleteGalleryPost(id){
   if(!confirm('이 시공 갤러리를 삭제하시겠습니까?\n삭제해도 이번 달 등록 한도는 복구되지 않습니다.'))return;
   const arr=getGallery();
   const idx=arr.findIndex(g=>g.id===id);
   if(idx<0)return;
+  const deletedAt=fmt(new Date());
+  if(GALLERY_CACHE&&sb){
+    const ok=await dbUpdateGalleryPost(id,{deleted:true,deleted_at:deletedAt});
+    if(!ok){ alert('삭제에 실패했습니다. (서버 권한 문제일 수 있습니다 — 새로고침 후 다시 시도하거나 담당자에게 문의해주세요)'); return; }
+  }
   arr[idx].deleted=true;
-  arr[idx].deletedAt=fmt(new Date());
+  arr[idx].deletedAt=deletedAt;
   saveGallery(arr);
   if(GALLERY_EDIT_ID===id){ GALLERY_EDIT_ID=null; resetGalleryUploadState(); }
   renderGallery();
@@ -4140,6 +4210,9 @@ async function createGalleryPost(){
   const product=(document.getElementById('g-product')?.value||'').trim();
   const desc=(document.getElementById('g-desc')?.value||'').trim();
   const files=Array.isArray(gallerySelectedFiles)?[...gallerySelectedFiles]:[];
+  // 갤러리 DB를 못 불러온 상태에서 등록하면 예전처럼 이 기기에만 저장돼 버리므로 한 번 더 불러오고, 그래도 안 되면 막습니다.
+  if(!GALLERY_CACHE){ await loadGallery(); }
+  if(!GALLERY_CACHE){alert('시공 갤러리 서버(DB)에 연결하지 못했습니다. 새로고침 후 다시 시도해주세요.');return;}
   if(galleryMonthlyCount(shop.id)>=2){alert('이 가맹점은 이번 달 시공 갤러리 등록 한도(2개)를 모두 사용했습니다.');return;}
   if(!model||!film||!product||!files.length){alert('차종, 필름 이름, 제품 요약, 사진은 필수입니다.');return;}
   if(files.length>10){alert('사진은 최대 10장까지 등록할 수 있습니다.');return;}
@@ -4156,7 +4229,7 @@ async function createGalleryPost(){
   }
   try{
     const arr=getGallery();
-    arr.push({
+    const post={
       id:'G'+Date.now(),
       issuerId:shop.id,
       shopName:shop.shopName,
@@ -4171,7 +4244,18 @@ async function createGalleryPost(){
       views:0,
       deleted:false,
       createdAt:fmt(new Date())
-    });
+    };
+    if(GALLERY_CACHE){
+      const row=galleryObjToRow(post);
+      const {error}=await sb.from('gallery_posts').insert(row);
+      if(error){
+        console.error('createGalleryPost',error);
+        alert('갤러리 등록에 실패했습니다: '+(error.message||'알 수 없는 오류')+'\n(서버 권한 문제일 수 있습니다 — 새로고침 후 다시 시도하거나 담당자에게 문의해주세요)');
+        if(btn){btn.disabled=false;btn.textContent='갤러리 등록';}
+        return;
+      }
+    }
+    arr.push(post);
     saveGallery(arr);
     resetGalleryUploadState();
     renderGallery();
@@ -4432,6 +4516,7 @@ addItemRow();
  // DB 연결(네트워크 장애 등)이 실패해도 홈/지점/패키지 등 DB와 무관한 화면은 정상 표시되도록 각 단계를 개별적으로 보호합니다.
  try{ await refreshMembersCache(); }catch(e){ console.error("refreshMembersCache failed",e); }
  try{ await loadCertConfig(); }catch(e){ console.error("loadCertConfig failed",e); }
+ try{ await loadGallery(); }catch(e){ console.error("loadGallery failed",e); }
  renderBranches();renderPackagePage();
  const __initFlow=new URLSearchParams(location.search).get("flow");
  show((__initFlow==="pkgpay"||__initFlow==="pkgpayfail")?"package":"home");
@@ -4496,7 +4581,7 @@ function renderHomePopularGallery(){
   if(!grid)return;
   let posts=[];
   try{ posts=getGallery(); }catch(e){ posts=[]; }
-  posts=posts.filter(p=>p&&typeof p==="object").sort((a,b)=>{
+  posts=posts.filter(p=>p&&typeof p==="object"&&!p.deleted).sort((a,b)=>{
     const av=Number(a.views||0), bv=Number(b.views||0);
     return bv-av || String(b.createdAt||'').localeCompare(String(a.createdAt||''));
   }).slice(0,10);
