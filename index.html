@@ -4060,6 +4060,7 @@ async function migrateLocalGalleryToDB(){
   }
   if(moved){console.info('migrateLocalGalleryToDB: '+moved+'건을 DB로 옮겼습니다.');renderGallery();renderHomePopularGallery();}
 }
+const GALLERY_MONTHLY_LIMIT=3; // 계정(가맹점)당 한 달에 등록할 수 있는 시공 갤러리 게시물 수
 function galleryMonth(d=new Date()){return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')}
 // 소프트 삭제(deleted 플래그)된 게시물도 포함해서 세야 합니다 — 삭제해도 이번 달 등록 한도가
 // 다시 채워지면 안 된다는 의도된 동작이라, 월별 건수는 getGallery()의 원본 배열 기준으로 셉니다.
@@ -4213,12 +4214,12 @@ function renderGalleryDetail(id){
 function renderGalleryAdminBox(){
   const box=document.getElementById('gallery-admin-box'); if(!box)return;
   if(!isAdminAuthed()){box.innerHTML='';return;}
-  const shop=getCurrentShopInfo(), used=galleryMonthlyCount(shop.id), left=Math.max(0,2-used);
+  const shop=getCurrentShopInfo(), used=galleryMonthlyCount(shop.id), left=Math.max(0,GALLERY_MONTHLY_LIMIT-used);
   const editing=GALLERY_EDIT_ID?getGallery().find(g=>g.id===GALLERY_EDIT_ID):null;
   box.innerHTML=`
     <div class="galleryAdmin">
       <h3>${editing?'시공 갤러리 수정':'시공 갤러리 등록'}</h3>
-      <div style="font-size:12px;color:var(--super);margin-bottom:12px">${esc(shop.shopName)} · 이번 달 ${used}/2건 등록 · ${left}건 추가 가능</div>
+      <div style="font-size:12px;color:var(--super);margin-bottom:12px">${esc(shop.shopName)} · 이번 달 ${used}/${GALLERY_MONTHLY_LIMIT}건 등록 · ${left}건 추가 가능</div>
       ${editing?`<div class="notice" style="margin-bottom:12px">수정은 사진을 제외한 내용만 바꿀 수 있습니다. 사진을 바꾸려면 삭제 후 새로 등록해주세요(월 등록 한도가 다시 차감됩니다).</div>`:''}
       <div class="grid2">
         <div class="field">
@@ -4251,7 +4252,7 @@ function renderGalleryAdminBox(){
           <div id="gallery-upload-preview" class="galleryUploadPreview"></div>
         </div>`}
       </div>
-      <div class="fileHint">한 게시글당 사진 최대 10장, 가맹점별 월 최대 2개까지 등록됩니다.</div>
+      <div class="fileHint">한 게시글당 사진 최대 10장, 가맹점별 월 최대 ${GALLERY_MONTHLY_LIMIT}개까지 등록됩니다.</div>
       <div class="actions">
         ${editing?`
         <button type="button" class="btn" onclick="resetGalleryUploadState(); renderGalleryAdminBox();">수정 취소</button>
@@ -4344,7 +4345,7 @@ async function createGalleryPost(){
   // 갤러리 DB를 못 불러온 상태에서 등록하면 예전처럼 이 기기에만 저장돼 버리므로 한 번 더 불러오고, 그래도 안 되면 막습니다.
   if(!GALLERY_CACHE){ await loadGallery(); }
   if(!GALLERY_CACHE){alert('시공 갤러리 서버(DB)에 연결하지 못했습니다. 새로고침 후 다시 시도해주세요.');return;}
-  if(galleryMonthlyCount(shop.id)>=2){alert('이 가맹점은 이번 달 시공 갤러리 등록 한도(2개)를 모두 사용했습니다.');return;}
+  if(galleryMonthlyCount(shop.id)>=GALLERY_MONTHLY_LIMIT){alert('이 가맹점은 이번 달 시공 갤러리 등록 한도('+GALLERY_MONTHLY_LIMIT+'개)를 모두 사용했습니다.');return;}
   if(!model||!film||!product||!files.length){alert('차종, 필름 이름, 제품 요약, 사진은 필수입니다.');return;}
   if(files.length>10){alert('사진은 최대 10장까지 등록할 수 있습니다.');return;}
   const btn=document.querySelector('#gallery-admin-box button.btn.super');
@@ -4512,7 +4513,7 @@ function renderProducts(){
 function renderAdminStats(){
   const existing=document.getElementById('admin-stats'); if(!existing||!isAdminAuthed())return;
   const me=getCurrentShopInfo(), my=warranties.filter(w=>w.issuerId===me.id), month=my.filter(w=>w.issued&&w.issued.startsWith(galleryMonth())).length;
-  existing.innerHTML=`<div class="adminStat"><span class="muted">이번 달 보증서</span><b>${month}건</b></div><div class="adminStat"><span class="muted">시공 갤러리</span><b>${galleryMonthlyCount(me.id)}/2건</b></div><div class="adminStat"><span class="muted">잔여 발행 한도</span><b>${remainingFor(me.id,me.totalCredits)}건</b></div>`;
+  existing.innerHTML=`<div class="adminStat"><span class="muted">이번 달 보증서</span><b>${month}건</b></div><div class="adminStat"><span class="muted">시공 갤러리</span><b>${galleryMonthlyCount(me.id)}/${GALLERY_MONTHLY_LIMIT}건</b></div><div class="adminStat"><span class="muted">잔여 발행 한도</span><b>${remainingFor(me.id,me.totalCredits)}건</b></div>`;
   renderReservationAdmin();
 }
 
