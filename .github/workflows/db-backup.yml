@@ -1,0 +1,53 @@
+# Supabase DB 자동 백업 (매일 한국시간 새벽 3시)
+# 필요한 GitHub Secrets:
+#   SUPABASE_DB_URL  : Supabase 대시보드 > Connect > Session pooler 연결 문자열 (비밀번호 포함)
+#   BACKUP_PASSWORD  : 백업 파일 암호 (분실하면 백업을 열 수 없음)
+# 백업 파일은 암호화된 상태로 Actions 실행 결과(Artifacts)에 30일 보관됩니다.
+# 매일 DB에 접속하므로 무료 플랜의 "7일 미사용 일시정지"도 함께 막아 줍니다.
+name: DB backup
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check secrets
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PW: ${{ secrets.BACKUP_PASSWORD }}
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$PW" ]; then
+            echo "::error::SUPABASE_DB_URL 또는 BACKUP_PASSWORD 시크릿이 없습니다."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump and encrypt
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PW: ${{ secrets.BACKUP_PASSWORD }}
+        run: |
+          STAMP=$(TZ=Asia/Seoul date +%Y%m%d-%H%M)
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" \
+            --schema=public --schema=auth \
+            --no-owner --no-privileges -Fc -f backup.dump
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PW" \
+            --symmetric --cipher-algo AES256 \
+            -o "tintlab-db-$STAMP.dump.gpg" backup.dump
+          rm backup.dump
+          ls -lh tintlab-db-*.dump.gpg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tintlab-db-backup
+          path: tintlab-db-*.dump.gpg
+          retention-days: 30
