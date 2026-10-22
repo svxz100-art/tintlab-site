@@ -1413,7 +1413,7 @@ function savePrecautions(arr){
 
 const CERT_TEMPLATE_KEY="tintrap_certificate_template_v1";
 const DEFAULT_CERT_TEMPLATE={
-  footer:"시공내역 문의 : {shopName} ({phone})\n본 보증서는 시공 내역을 기반으로 자동 발급되었습니다."
+  footer:"시공내역 문의 : {shopName} ({phone})\n본 보증서는 시공 내역을 기반으로 자동 발급되었습니다.\n시공 및 보증에 대한 책임은 시공 매장({shopName})에 있으며, 본 플랫폼은 보증서 발행 도구만 제공합니다."
 };
 function getCertTemplate(){
   if(CERT_CONFIG_CACHE)return {footer:CERT_CONFIG_CACHE.footer};
